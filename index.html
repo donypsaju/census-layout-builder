@@ -3,417 +3,346 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Census Layout Map Generator - 2027</title>
+    <title>Census Block Mapper - OSM</title>
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Leaflet Geoman (Drawing Tools) -->
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+
     <style>
-        /* Print layout handling */
-        @media print {
-            body {
-                background: white;
-                color: black;
-                padding: 0;
-                margin: 0;
-            }
-            .no-print {
-                display: none !important;
-            }
-            .print-page {
-                border: none !important;
-                box-shadow: none !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                page-break-after: always;
-                width: var(--print-w) !important;
-                height: var(--print-h) !important;
-            }
-            #mapCanvas {
-                border: 2px solid #000 !important;
-            }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+        #map { width: 100%; height: 100%; z-index: 10; }
+        
+        /* Decoupled Reference Image Overlay */
+        #image-overlay-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let map events pass through unless dragging */
+            z-index: 400;
+            overflow: hidden;
+            display: none;
         }
-
-        /* Default page container adjustments for web viewing */
-        .print-page {
-            transition: all 0.3s ease;
-            position: relative;
-            background: #ffffff;
+        #reference-image {
+            position: absolute;
+            transform-origin: center center;
+            cursor: grab;
+            pointer-events: auto; /* Allow interaction with the image itself */
         }
-
-        /* Crosshatch patterns using CSS backgrounds for Canvas context drawing fallback */
-        .legend-hatch {
-            background: repeating-linear-gradient(45deg, #000, #000 1px, transparent 1px, transparent 4px),
-                        repeating-linear-gradient(-45deg, #000, #000 1px, #fff 1px, #fff 4px);
+        #reference-image:active {
+            cursor: grabbing;
         }
+        
+        /* Custom markers for Census Types */
+        .census-marker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 10px;
+            color: black;
+            border: 2px solid black;
+            background: white;
+        }
+        .marker-pucca { border-radius: 2px; }
+        .marker-kutcha { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); padding-top: 5px; }
+        .marker-nr { background: repeating-linear-gradient(45deg, #ccc, #ccc 2px, #fff 2px, #fff 4px); }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col">
+<body class="flex h-screen bg-slate-900 font-sans text-slate-200">
 
-    <!-- Navbar / Controls Panel -->
-    <header class="bg-slate-900 text-white shadow-md p-4 no-print sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-                <h1 class="text-xl font-bold tracking-wide">2027 Census Layout Map Canvas</h1>
-                <p class="text-xs text-slate-400">Compliant with 2027_Census_Mapping_Symbols_Guide.png parameters</p>
-            </div>
+    <!-- Control Panel -->
+    <aside class="w-80 bg-slate-800 flex flex-col h-full border-r border-slate-700 shadow-xl z-50 overflow-y-auto">
+        <div class="p-4 border-b border-slate-700">
+            <h1 class="text-lg font-bold text-white">Census Map Interface</h1>
+            <p class="text-xs text-slate-400 mt-1">OSM + Geoman Integration</p>
+        </div>
+
+        <div class="p-4 flex flex-col gap-6">
             
-            <div class="flex flex-wrap items-center gap-3">
-                <!-- File Upload -->
-                <label class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded shadow cursor-pointer font-medium transition">
-                    Upload Block JSON
-                    <input type="file" id="jsonFile" accept=".json" class="hidden">
+            <!-- Step 1: Data -->
+            <div>
+                <h2 class="text-sm font-semibold text-slate-300 mb-2 uppercase tracking-wide">1. Data Coordinates</h2>
+                <label class="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 px-4 rounded cursor-pointer transition">
+                    Upload JSON File
+                    <input type="file" id="json-upload" accept=".json" class="hidden">
                 </label>
+                <div id="data-stats" class="text-xs text-slate-400 mt-2 hidden"></div>
+            </div>
 
-                <!-- Print Options Selection -->
-                <div class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded border border-slate-700">
-                    <label for="pageSize" class="text-xs text-slate-400 font-semibold">Size:</label>
-                    <select id="pageSize" class="bg-slate-900 text-white text-sm rounded border border-slate-600 px-2 py-1 focus:outline-none focus:border-blue-500">
-                        <option value="A4-portrait">A4 (Portrait)</option>
-                        <option value="A4-landscape" selected>A4 (Landscape)</option>
-                        <option value="A3-portrait">A3 (Portrait)</option>
-                        <option value="A3-landscape">A3 (Landscape)</option>
-                        <option value="custom">Custom Size...</option>
-                    </select>
+            <hr class="border-slate-700">
+
+            <!-- Step 2: Overlay -->
+            <div>
+                <h2 class="text-sm font-semibold text-slate-300 mb-2 uppercase tracking-wide">2. Reference Overlay</h2>
+                <label class="block w-full text-center bg-emerald-600 hover:bg-emerald-700 text-white text-sm py-2 px-4 rounded cursor-pointer transition mb-3">
+                    Upload Map Image
+                    <input type="file" id="image-upload" accept="image/*" class="hidden">
+                </label>
+                
+                <!-- Image Controls -->
+                <div id="image-controls" class="hidden flex-col gap-3 bg-slate-900 p-3 rounded border border-slate-700">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs">Visibility</label>
+                        <input type="checkbox" id="toggle-image" checked class="cursor-pointer">
+                    </div>
+                    
+                    <div>
+                        <label class="text-xs flex justify-between">Opacity <span id="val-opacity">0.5</span></label>
+                        <input type="range" id="ctrl-opacity" min="0" max="1" step="0.05" value="0.5" class="w-full">
+                    </div>
+                    
+                    <div>
+                        <label class="text-xs flex justify-between">Scale <span id="val-scale">1.0</span></label>
+                        <input type="range" id="ctrl-scale" min="0.1" max="5" step="0.05" value="1" class="w-full">
+                    </div>
+                    
+                    <div>
+                        <label class="text-xs flex justify-between">Rotation <span id="val-rotate">0°</span></label>
+                        <input type="range" id="ctrl-rotate" min="-180" max="180" step="1" value="0" class="w-full">
+                    </div>
+
+                    <p class="text-[10px] text-slate-400 leading-tight mt-1">
+                        Click and drag the image on the map to position it. Use the draw tools on the left of the map to trace boundaries.
+                    </p>
                 </div>
+            </div>
 
-                <!-- Custom Size Box (Hidden initially) -->
-                <div id="customSizeBox" class="hidden flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded border border-slate-700">
-                    <input type="number" id="customW" placeholder="W (mm)" class="w-16 bg-slate-900 text-white text-sm px-1.5 py-0.5 rounded border border-slate-600 text-center">
-                    <span class="text-xs text-slate-400">×</span>
-                    <input type="number" id="customH" placeholder="H (mm)" class="w-16 bg-slate-900 text-white text-sm px-1.5 py-0.5 rounded border border-slate-600 text-center">
-                </div>
+            <hr class="border-slate-700">
 
-                <button id="printBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-5 py-2 rounded shadow font-semibold transition flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                    Print Layout
+            <!-- Utilities -->
+            <div>
+                <h2 class="text-sm font-semibold text-slate-300 mb-2 uppercase tracking-wide">3. Utilities</h2>
+                <button id="clear-cache" class="w-full bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800 text-xs py-2 px-4 rounded transition">
+                    Clear Saved Map Location
                 </button>
             </div>
         </div>
-    </header>
+    </aside>
 
-    <!-- Main Workspace Area -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col items-center justify-start gap-6">
-        
-        <!-- Instructional Splash State -->
-        <div id="uploadSplash" class="no-print w-full max-w-md my-12 bg-white rounded-xl shadow-md p-8 text-center border border-gray-200">
-            <div class="text-blue-500 mb-4 flex justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-14 w-14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-            </div>
-            <h2 class="text-lg font-bold text-gray-900 mb-2">No Census Block JSON Uploaded</h2>
-            <p class="text-sm text-gray-500 mb-6">Select your allocated census block structural coordinates data array file to map out structure matrices.</p>
-        </div>
-
-        <!-- Render Target Wrapper -->
-        <div id="printContainer" class="hidden flex justify-center w-full overflow-auto p-4">
-            <div id="sheet" class="print-page bg-white shadow-2xl border border-gray-400 flex flex-col p-8 box-border">
-                
-                <!-- Layout Header Template -->
-                <div class="flex justify-between items-start border-b-2 border-slate-900 pb-3 mb-4">
-                    <div>
-                        <h2 class="text-2xl font-black tracking-tight text-slate-900">CENSUS OF INDIA 2027</h2>
-                        <h3 class="text-sm font-bold uppercase tracking-wider text-slate-600 mt-0.5">Houselisting Block Layout Map</h3>
-                    </div>
-                    <div class="text-right text-xs space-y-0.5 text-slate-700 font-mono">
-                        <div><strong>Region Context:</strong> Pala, Kerala</div>
-                        <div id="metaCount"><strong>Mapped Buildings:</strong> 0</div>
-                    </div>
-                </div>
-
-                <!-- Canvas Component Wrapper -->
-                <div class="flex-1 relative bg-slate-50 border border-slate-300 rounded overflow-hidden">
-                    <canvas id="mapCanvas" class="w-full h-full block bg-white"></canvas>
-                </div>
-
-                <!-- Footer & Structural Guide Legend Grid -->
-                <div class="grid grid-cols-4 gap-4 mt-4 border-t-2 border-slate-900 pt-3 text-[10px] text-slate-800">
-                    <div>
-                        <span class="font-bold block uppercase tracking-wider text-slate-900 mb-1.5">Building Classifications</span>
-                        <div class="space-y-1">
-                            <div class="flex items-center gap-2"><span class="inline-block w-3.5 h-3.5 border border-black bg-white"></span> Pucca Res[cite: 1]</div>
-                            <div class="flex items-center gap-2"><span class="inline-block w-3.5 h-3.5 border border-black legend-hatch"></span> Pucca Non-Res[cite: 1]</div>
-                        </div>
-                    </div>
-                    <div>
-                        <span class="font-bold block uppercase tracking-wider text-slate-900 mb-1.5">&nbsp;</span>
-                        <div class="space-y-1">
-                            <div class="flex items-center gap-2">
-                                <span class="inline-block" style="width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:12px solid #000; position:relative;"><span style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-bottom:10px solid #fff; position:absolute; top:1px; left:-6px;"></span></span> 
-                                Kutcha Res[cite: 1]
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="inline-block legend-hatch" style="width:14px; height:12px; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); border: 1px solid black;"></span> 
-                                Kutcha Non-Res[cite: 1]
-                            </div>
-                        </div>
-                    </div>
-                    <div>
-                        <span class="font-bold block uppercase tracking-wider text-slate-900 mb-1.5">Label Standard</span>
-                        <div class="flex items-center gap-2">
-                            <div class="border border-black px-1 py-0.5 bg-white font-mono text-center text-[8px] leading-tight">
-                                <div>9</div>
-                                <div class="border-t border-black">(2)</div>
-                            </div>
-                            <div>
-                                <span class="font-bold block">Census Structure</span>
-                                <span class="text-slate-500">Building # / (Houses)[cite: 1]</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="border-l border-slate-300 pl-4 flex flex-col justify-between">
-                        <div>
-                            <span class="font-bold block text-slate-900 uppercase tracking-wider">Verification Signature</span>
-                            <div class="mt-4 border-b border-dashed border-slate-400 w-full"></div>
-                        </div>
-                        <div class="text-right text-slate-400 font-mono text-[8px]">Ref: 2027_Census_Mapping_Symbols_Guide.png[cite: 1]</div>
-                    </div>
-                </div>
-
-            </div>
+    <!-- Map Area -->
+    <main class="flex-1 relative bg-slate-950">
+        <div id="map"></div>
+        <div id="image-overlay-container">
+            <img id="reference-image" src="" alt="Reference Overlay">
         </div>
     </main>
 
     <script>
-        // Preset Real World Print Sizes configuration mapped directly to layout pixel space ratios at 96 DPI
-        const sizePresets = {
-            "A4-portrait": { widthMM: 210, heightMM: 297 },
-            "A4-landscape": { widthMM: 297, heightMM: 210 },
-            "A3-portrait": { widthMM: 297, heightMM: 420 },
-            "A3-landscape": { widthMM: 420, heightMM: 297 }
-        };
+        // --- Map Initialization ---
+        // Default to a central coordinate if localStorage is empty
+        const defaultCenter = [9.736, 76.518]; // Fallback based on your dataset
+        let initialCenter = defaultCenter;
+        let initialZoom = 16;
 
-        let currentDataset = null;
+        // Requirement 4: Restore previous location from localStorage
+        const savedView = localStorage.getItem('censusMapState');
+        if (savedView) {
+            try {
+                const state = JSON.parse(savedView);
+                initialCenter = state.center;
+                initialZoom = state.zoom;
+            } catch (e) {
+                console.error("Corrupted localStorage state.");
+            }
+        }
 
-        const jsonFileInput = document.getElementById('jsonFile');
-        const pageSizeSelect = document.getElementById('pageSize');
-        const customSizeBox = document.getElementById('customSizeBox');
-        const customWInput = document.getElementById('customW');
-        const customHInput = document.getElementById('customH');
-        const printBtn = document.getElementById('printBtn');
-        const uploadSplash = document.getElementById('uploadSplash');
-        const printContainer = document.getElementById('printContainer');
-        const sheet = document.getElementById('sheet');
-        const canvas = document.getElementById('mapCanvas');
-        const ctx = canvas.getContext('2d');
+        const map = L.map('map').setView(initialCenter, initialZoom);
 
-        // Watch for file dynamic entry point
-        jsonFileInput.addEventListener('change', (e) => {
+        // Requirement 2: OpenStreetMap Tile Layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 22,
+            maxNativeZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Initialize Geoman Drawing Tools (Requirement 3: Boundaries)
+        map.pm.addControls({
+            position: 'topleft',
+            drawCircleMarker: false,
+            drawPolyline: true,
+            drawRectangle: true,
+            drawPolygon: true,
+            drawCircle: false,
+            editMode: true,
+            dragMode: true,
+            cutPolygon: false,
+            removalMode: true,
+        });
+
+        // Save map state on movement to persist across reloads
+        map.on('moveend', () => {
+            const state = {
+                center: map.getCenter(),
+                zoom: map.getZoom()
+            };
+            localStorage.setItem('censusMapState', JSON.stringify(state));
+        });
+
+        // --- Handle JSON Upload (Requirement 1) ---
+        let markersLayer = L.layerGroup().addTo(map);
+
+        document.getElementById('json-upload').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
             reader.onload = function(event) {
                 try {
-                    currentDataset = JSON.parse(event.target.result);
-                    uploadSplash.classList.add('hidden');
-                    printContainer.classList.remove('hidden');
-                    document.getElementById('metaCount').innerHTML = `<strong>Mapped Buildings:</strong> ${currentDataset.length}`;
-                    updateSheetDimensions();
+                    const data = JSON.parse(event.target.result);
+                    plotDataOnMap(data);
                 } catch (err) {
-                    alert("Invalid JSON schema structure uploaded. Please check input parameters.");
+                    alert("Failed to parse JSON. Ensure the format matches the census structure array.");
                 }
             };
             reader.readAsText(file);
         });
 
-        pageSizeSelect.addEventListener('change', () => {
-            if (pageSizeSelect.value === 'custom') {
-                customSizeBox.classList.remove('hidden');
-            } else {
-                customSizeBox.classList.add('hidden');
+        function plotDataOnMap(data) {
+            markersLayer.clearLayers();
+            const bounds = [];
+
+            data.forEach(item => {
+                if (!item.coords || item.coords.length !== 2) return;
+                
+                const lat = item.coords[0];
+                const lng = item.coords[1];
+                bounds.push([lat, lng]);
+
+                // Determine CSS classes based on structural properties
+                let baseClass = 'census-marker ';
+                if (item.type === 'pucca-house') baseClass += 'marker-pucca ';
+                if (item.type === 'kutcha-house') baseClass += 'marker-kutcha ';
+                if (item.subtype === 'nr') baseClass += 'marker-nr ';
+
+                const icon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div class="${baseClass}" style="width:24px; height:24px;">${item.name || ''}</div>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+
+                const popupContent = `
+                    <div class="text-sm">
+                        <strong>Bldg No:</strong> ${item.name}<br>
+                        <strong>Type:</strong> ${item.type}<br>
+                        <strong>Subtype:</strong> ${item.subtype === 'res' ? 'Residential' : 'Non-Residential'}<br>
+                        <strong>Houses (Count):</strong> ${item.censusCount}<br>
+                        <strong>Coords:</strong> ${lat.toFixed(5)}, ${lng.toFixed(5)}<br>
+                        ${item.note ? `<strong>Note:</strong> ${item.note}` : ''}
+                    </div>
+                `;
+
+                L.marker([lat, lng], { icon: icon }).bindPopup(popupContent).addTo(markersLayer);
+            });
+
+            if (bounds.length > 0) {
+                const mapBounds = L.latLngBounds(bounds);
+                map.fitBounds(mapBounds, { padding: [50, 50] });
+                
+                // Update stats UI
+                const stats = document.getElementById('data-stats');
+                stats.classList.remove('hidden');
+                stats.innerHTML = `Plotted <strong>${bounds.length}</strong> structures.`;
             }
-            updateSheetDimensions();
+        }
+
+        // --- Handle Image Overlay & Transformations (Requirement 3) ---
+        const imageUpload = document.getElementById('image-upload');
+        const imgContainer = document.getElementById('image-overlay-container');
+        const refImage = document.getElementById('reference-image');
+        const imgControls = document.getElementById('image-controls');
+
+        // State variables for image transformations
+        let imgState = {
+            x: 0, y: 0, scale: 1, rotate: 0, opacity: 0.5
+        };
+
+        imageUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                refImage.src = event.target.result;
+                imgContainer.style.display = 'block';
+                imgControls.classList.remove('hidden');
+                imgControls.classList.add('flex');
+                
+                // Reset position to center of screen
+                refImage.onload = () => {
+                    const rect = imgContainer.getBoundingClientRect();
+                    imgState.x = (rect.width - refImage.width) / 2;
+                    imgState.y = (rect.height - refImage.height) / 2;
+                    updateImageTransform();
+                }
+            };
+            reader.readAsDataURL(file);
         });
 
-        customWInput.addEventListener('input', updateSheetDimensions);
-        customHInput.addEventListener('input', updateSheetDimensions);
-        window.addEventListener('resize', () => { if(currentDataset) renderMapVisuals(); });
+        // UI Listeners for transformation sliders
+        document.getElementById('toggle-image').addEventListener('change', (e) => {
+            refImage.style.display = e.target.checked ? 'block' : 'none';
+        });
 
-        function updateSheetDimensions() {
-            let widthMM, heightMM;
-            const selection = pageSizeSelect.value;
+        document.getElementById('ctrl-opacity').addEventListener('input', (e) => {
+            imgState.opacity = e.target.value;
+            document.getElementById('val-opacity').innerText = imgState.opacity;
+            updateImageTransform();
+        });
 
-            if (selection === 'custom') {
-                widthMM = parseFloat(customWInput.value) || 297;
-                heightMM = parseFloat(customHInput.value) || 210;
-            } else {
-                widthMM = sizePresets[selection].widthMM;
-                heightMM = sizePresets[selection].heightMM;
-            }
+        document.getElementById('ctrl-scale').addEventListener('input', (e) => {
+            imgState.scale = e.target.value;
+            document.getElementById('val-scale').innerText = imgState.scale;
+            updateImageTransform();
+        });
 
-            // Set variables dynamically injected into browser @media layout calculations
-            document.documentElement.style.setProperty('--print-w', `${widthMM}mm`);
-            document.documentElement.style.setProperty('--print-h', `${heightMM}mm`);
+        document.getElementById('ctrl-rotate').addEventListener('input', (e) => {
+            imgState.rotate = e.target.value;
+            document.getElementById('val-rotate').innerText = imgState.rotate + '°';
+            updateImageTransform();
+        });
 
-            // Adapt structural view container scaling matching exact aspect boundaries
-            sheet.style.width = `${widthMM}mm`;
-            sheet.style.height = `${heightMM}mm`;
-
-            setTimeout(renderMapVisuals, 50);
+        function updateImageTransform() {
+            refImage.style.opacity = imgState.opacity;
+            refImage.style.transform = `translate(${imgState.x}px, ${imgState.y}px) scale(${imgState.scale}) rotate(${imgState.rotate}deg)`;
         }
 
-        // Draw crosshatching patterns using plain canvas path directives
-        function createHatchPattern() {
-            const pCanvas = document.createElement('canvas');
-            pCanvas.width = 8;
-            pCanvas.height = 8;
-            const pCtx = pCanvas.getContext('2d');
-            pCtx.strokeStyle = '#000000';
-            pCtx.lineWidth = 1;
-            
-            pCtx.beginPath();
-            pCtx.moveTo(0, 8);
-            pCtx.lineTo(8, 0);
-            pCtx.moveTo(0, 0);
-            pCtx.lineTo(8, 8);
-            pCtx.stroke();
-            
-            return ctx.createPattern(pCanvas, 'repeat');
-        }
+        // Dragging physics for the decoupled image overlay
+        let isDragging = false;
+        let startX, startY;
 
-        function renderMapVisuals() {
-            if (!currentDataset || currentDataset.length === 0) return;
+        refImage.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX - imgState.x;
+            startY = e.clientY - imgState.y;
+            e.preventDefault(); // Prevent default image dragging behavior
+        });
 
-            // Establish coordinate device scale factors using Canvas bounding box context dimensions
-            const dpr = window.devicePixelRatio || 1;
-            const rect = canvas.getBoundingClientRect();
-            
-            canvas.width = rect.width * dpr;
-            canvas.height = rect.height * dpr;
-            ctx.scale(dpr, dpr);
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            imgState.x = e.clientX - startX;
+            imgState.y = e.clientY - startY;
+            updateImageTransform();
+        });
 
-            const displayWidth = rect.width;
-            const displayHeight = rect.height;
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
 
-            ctx.clearRect(0, 0, displayWidth, displayHeight);
-
-            // Extract bounding coordinate spaces based on Data array inputs [Lat, Lon]
-            let lats = currentDataset.map(d => d.coords[0]);
-            let lons = currentDataset.map(d => d.coords[1]);
-
-            let minLat = Math.min(...lats);
-            let maxLat = Math.max(...lats);
-            let minLon = Math.min(...lons);
-            let maxLon = Math.max(...lons);
-
-            let latSpan = maxLat - minLat;
-            let lonSpan = maxLon - minLon;
-
-            // Buffer spacing logic ensuring markers aren't clipped against canvas viewport edge margins
-            if (latSpan === 0) latSpan = 0.001;
-            if (lonSpan === 0) lonSpan = 0.001;
-
-            const edgeMargin = 45; 
-            const usableW = displayWidth - (edgeMargin * 2);
-            const usableH = displayHeight - (edgeMargin * 2);
-
-            // Compute scaling factors preserving standard spatial aspect matrices inside rendering canvas view viewport
-            const scaleX = usableW / lonSpan;
-            const scaleY = usableH / latSpan;
-            const uniformScale = Math.min(scaleX, scaleY);
-
-            // Calculated geographic coordinate shifts centered safely
-            const offsetX = edgeMargin + (usableW - (lonSpan * uniformScale)) / 2;
-            const offsetY = edgeMargin + (usableH - (latSpan * uniformScale)) / 2;
-
-            const hatchPattern = createHatchPattern();
-
-            // Render loop over data tracking nodes mapping structures
-            currentDataset.forEach(building => {
-                const bLon = building.coords[1];
-                const bLat = building.coords[0];
-
-                // Project points: Standard Cartesian conversion mapping Y downward inverse
-                const x = offsetX + (bLon - minLon) * uniformScale;
-                const y = offsetY + (maxLat - bLat) * uniformScale;
-
-                const isNonRes = building.subtype === 'nr';
-                const size = 16; 
-
-                ctx.save();
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = '#000000';
-
-                // Core shape configuration maps matching verification matrices from "2027_Census_Mapping_Symbols_Guide.png"[cite: 1]
-                if (building.type === 'pucca-house') {
-                    // Pucca -> Crisp Uniform Square representation structure[cite: 1]
-                    ctx.beginPath();
-                    ctx.rect(x - size/2, y - size/2, size, size);
-                    if (isNonRes) {
-                        ctx.fillStyle = hatchPattern;
-                        ctx.fill();
-                    } else {
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fill();
-                    }
-                    ctx.stroke();
-                } else if (building.type === 'kutcha-house') {
-                    // Kutcha -> Standard Equilateral Triangle geometry structure layout[cite: 1]
-                    ctx.beginPath();
-                    ctx.moveTo(x, y - size/2);
-                    ctx.lineTo(x + size/2, y + size/2);
-                    ctx.lineTo(x - size/2, y + size/2);
-                    ctx.closePath();
-                    if (isNonRes) {
-                        ctx.fillStyle = hatchPattern;
-                        ctx.fill();
-                    } else {
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fill();
-                    }
-                    ctx.stroke();
-                } else {
-                    // Wildcard structural fallback node element mapping logic
-                    ctx.beginPath();
-                    ctx.arc(x, y, size/2, 0, 2 * Math.PI);
-                    ctx.fillStyle = '#e2e8f0';
-                    ctx.fill();
-                    ctx.stroke();
-                }
-
-                ctx.restore();
-
-                // Dynamic Stacked Fraction Block Text Rendering (Building number on top / House count in parentheses below)[cite: 1]
-                const bName = building.name || '?';
-                const bCount = `(${building.censusCount ?? 1})`;
-                
-                ctx.save();
-                ctx.font = 'bold 9px monospace';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                
-                // Track offset distances cleanly away from active vector shape markers
-                const labelOffsetY = (building.type === 'kutcha-house') ? size * 1.1 : size * 0.9;
-                const labelCenterY = y + labelOffsetY;
-
-                const txtW = Math.max(ctx.measureText(bName).width, ctx.measureText(bCount).width) + 6;
-                const txtH = 20; 
-
-                // Draw solid baseline wrapper shield for structural labels preventing overlapping readability loss
-                ctx.fillStyle = '#ffffff';
-                ctx.strokeStyle = '#000000';
-                ctx.lineWidth = 0.5;
-                ctx.fillRect(x - txtW/2, labelCenterY - txtH/2, txtW, txtH);
-                ctx.strokeRect(x - txtW/2, labelCenterY - txtH/2, txtW, txtH);
-
-                // Horizontal dividing line separating Building Identifiers from Context House Count instances[cite: 1]
-                ctx.beginPath();
-                ctx.moveTo(x - txtW/2, labelCenterY);
-                ctx.lineTo(x + txtW/2, labelCenterY);
-                ctx.stroke();
-
-                // Text content outputs
-                ctx.fillStyle = '#000000';
-                ctx.fillText(bName, x, labelCenterY - 5);
-                ctx.fillText(bCount, x, labelCenterY + 5);
-
-                ctx.restore();
-            });
-        }
-
-        printBtn.addEventListener('click', () => {
-            if (!currentDataset) {
-                alert("Please drop/upload a valid structural mapping dataset before issuing print canvas requests.");
-                return;
-            }
-            window.print();
+        // Utility: Clear local storage cache
+        document.getElementById('clear-cache').addEventListener('click', () => {
+            localStorage.removeItem('censusMapState');
+            alert('Saved location cleared. Page will reset to default center on next reload.');
         });
     </script>
 </body>
