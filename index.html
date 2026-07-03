@@ -29,7 +29,7 @@
         .map-normal-mode { filter: none; }
         .map-blank-mode { background: #ffffff !important; }
 
-        /* Structural Markers */
+        /* Structural Markers - Downscaled to prevent DOM collision */
         .custom-icon-wrapper { pointer-events: none; }
         .census-shape {
             display: flex; align-items: center; justify-content: center;
@@ -37,59 +37,67 @@
             position: relative; z-index: 10;
         }
         
-        .marker-pucca { width: 20px; height: 20px; border-radius: 1px; }
+        .marker-pucca { width: 16px; height: 16px; border-radius: 1px; }
         .marker-kutcha { 
             width: 0; height: 0; 
-            border-left: 12px solid transparent; border-right: 12px solid transparent; border-bottom: 20px solid #000;
+            border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 16px solid #000;
             background: none !important; border: none !important; position: relative;
         }
         .marker-kutcha::after {
-            content: ''; position: absolute; top: 2px; left: -10px; width: 0; height: 0;
-            border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 17px solid #fff;
+            content: ''; position: absolute; top: 2px; left: -7px; width: 0; height: 0;
+            border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 13px solid #fff;
         }
 
         .hatch-pucca { background: repeating-linear-gradient(45deg, #000, #000 1px, #fff 1px, #fff 3px) !important; }
-        .hatch-kutcha::after { border-bottom: 17px solid transparent; background: repeating-linear-gradient(45deg, #000, #000 1px, transparent 1px, transparent 3px); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+        .hatch-kutcha::after { border-bottom: 13px solid transparent; background: repeating-linear-gradient(45deg, #000, #000 1px, transparent 1px, transparent 3px); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+
+        /* Third structural category: landmarks / utility / other non-house structures (e.g. transformer, temple) */
+        .marker-other { width: 15px; height: 15px; border-radius: 50%; }
+        .hatch-other { background: repeating-linear-gradient(45deg, #000, #000 1px, #fff 1px, #fff 3px) !important; }
+
+        /* Optional decluttering for dense blocks: hide number/count tags, keep shapes only */
+        body.hide-labels .census-label { display: none; }
 
         .census-label {
-            position: absolute; top: -28px; left: 50%; transform: translateX(-50%);
-            background: rgba(255,255,255,0.9); border: 1px solid #000;
-            color: #000; font-family: monospace; font-size: 10px; font-weight: bold;
-            line-height: 1; text-align: center; padding: 1px 3px; border-radius: 2px;
-            pointer-events: auto; z-index: 20; min-width: 24px;
+            position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+            background: rgba(255,255,255,0.95); border: 1px solid #000;
+            color: #000; font-family: monospace; font-size: 8px; font-weight: bold;
+            line-height: 1; text-align: center; padding: 1px 2px; border-radius: 2px;
+            pointer-events: auto; z-index: 20; min-width: 18px;
         }
         .census-label-divider { border-top: 1px solid #000; margin: 1px 0; width: 100%; }
 
-        /* Hidden Print Template Styles - Engineered for A4 Landscape Document rendering */
+        /* Hidden Print Template Styles */
         #print-template {
             position: absolute; left: -9999px; top: 0;
-            width: 297mm; height: 210mm; /* A4 Landscape */
+            width: 297mm; height: 210mm; /* Default A4 Landscape layout scaling basis */
             background: white; color: black; font-family: Arial, sans-serif;
-            box-sizing: border-box; padding: 10mm;
+            box-sizing: border-box; padding: 8mm;
             display: flex; flex-direction: column;
             z-index: -100;
         }
         
-        .print-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5mm; border-bottom: 2px solid black; padding-bottom: 2mm;}
-        .print-header h1 { font-size: 16pt; font-weight: bold; margin: 0; text-transform: uppercase; }
+        .print-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4mm; border-bottom: 2px solid black; padding-bottom: 2mm;}
+        .print-header h1 { font-size: 14pt; font-weight: bold; margin: 0; text-transform: uppercase; }
         
-        .print-body { display: flex; flex: 1; gap: 5mm; }
+        .print-body { display: flex; flex: 1; gap: 4mm; }
         
-        .print-sidebar { width: 70mm; display: flex; flex-direction: column; gap: 4mm; font-size: 9pt; }
+        .print-sidebar { width: 60mm; display: flex; flex-direction: column; gap: 3mm; font-size: 8pt; }
         .code-row { display: flex; justify-content: space-between; align-items: center; }
         .code-boxes { display: flex; gap: 2px; }
-        .code-box { width: 15px; height: 15px; border: 1px solid black; display: flex; align-items: center; justify-content: center; font-family: monospace; font-weight: bold;}
+        .code-box { width: 12px; height: 12px; border: 1px solid black; display: flex; align-items: center; justify-content: center; font-family: monospace; font-weight: bold;}
         
         .print-map-area { flex: 1; border: 2px solid black; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #fff;}
-        .print-map-area img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .print-map-area img { width: 100%; height: 100%; object-fit: cover; } /* Forced cover to eliminate margins */
 
-        .print-footer { margin-top: 5mm; display: flex; justify-content: space-between; font-size: 10pt; border-top: 1px dashed black; padding-top: 5mm;}
-        .signature-block { display: flex; flex-direction: column; gap: 8mm; width: 60mm;}
-        .signature-line { border-top: 1px solid black; text-align: center; font-size: 8pt; padding-top: 2px;}
+        .print-footer { margin-top: 4mm; display: flex; justify-content: space-between; font-size: 9pt; border-top: 1px dashed black; padding-top: 4mm;}
+        .signature-block { display: flex; flex-direction: column; gap: 6mm; width: 50mm;}
+        .signature-line { border-top: 1px solid black; text-align: center; font-size: 7pt; padding-top: 2px;}
 
-        /* Hide specific UI elements during map screenshot capture */
+        /* Isolation classes */
         .capturing-map .leaflet-control-container,
-        .capturing-map #toggle-sidebar { display: none !important; }
+        .capturing-map #toggle-sidebar,
+        .capturing-map .overlay-handle-wrapper { display: none !important; }
     </style>
 </head>
 <body class="flex h-screen text-slate-300 antialiased overflow-hidden">
@@ -102,7 +110,6 @@
 
         <div class="flex-1 overflow-y-auto p-4 space-y-6">
             
-            <!-- Metadata Entry -->
             <section>
                 <h2 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-700 pb-1">1. Administrative Data</h2>
                 <div class="space-y-2">
@@ -133,56 +140,94 @@
                 </div>
             </section>
 
-            <!-- Data & Image Uploads -->
             <section>
                 <h2 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-700 pb-1">2. Map Assets</h2>
                 <div class="space-y-3">
-                    <label class="block w-full text-center bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 rounded cursor-pointer transition-colors">
-                        Load Block Coordinates (JSON)
-                        <input type="file" id="json-upload" accept=".json" class="hidden">
-                    </label>
-                    <label class="block w-full text-center bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold py-2 rounded cursor-pointer transition-colors">
-                        Load Overlay Image
-                        <input type="file" id="image-upload" accept="image/*" class="hidden">
-                    </label>
+                    <div>
+                        <label class="block w-full text-center bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 rounded cursor-pointer transition-colors">
+                            Load Block Coordinates (JSON)
+                            <input type="file" id="json-upload" accept=".json" class="hidden">
+                        </label>
+                        <div id="json-status" class="hidden mt-2 text-[10px] leading-relaxed bg-slate-950 border border-slate-800 rounded p-2 text-slate-400 space-y-1"></div>
+                        <label class="flex items-center gap-2 mt-2 text-[10px] text-slate-400 cursor-pointer">
+                            <input type="checkbox" id="toggle-labels" checked class="accent-indigo-500">
+                            Show house number labels
+                        </label>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-800">
+                        <label class="block w-full text-center bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold py-2 rounded cursor-pointer transition-colors">
+                            Load Overlay Image
+                            <input type="file" id="image-upload" accept="image/*" class="hidden">
+                        </label>
+                        <div id="overlay-controls" class="hidden mt-2 space-y-2 bg-slate-950 border border-slate-800 rounded p-2">
+                            <p class="text-[9px] text-slate-500 leading-snug">Drag the two amber handles on the map to stretch/reposition the image over real landmarks, then trace the boundary on top of it with the polygon tool.</p>
+                            <div class="flex justify-between items-center">
+                                <label class="text-[10px] text-slate-500 uppercase">Opacity</label>
+                                <span id="opacity-value" class="text-[10px] text-slate-400">50%</span>
+                            </div>
+                            <input type="range" id="overlay-opacity" min="10" max="100" value="50" class="w-full accent-indigo-500">
+                            <label class="flex items-center gap-2 text-[10px] text-slate-400 cursor-pointer">
+                                <input type="checkbox" id="overlay-in-pdf" class="accent-indigo-500">
+                                Include this image in the printed PDF
+                            </label>
+                            <button id="remove-overlay" class="w-full text-center bg-red-950 hover:bg-red-900 text-red-300 text-[10px] font-semibold py-1.5 rounded transition-colors border border-red-900">
+                                Remove Overlay
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            <!-- PDF Generation -->
             <section>
                 <h2 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-700 pb-1">3. Document Generation</h2>
-                <div class="bg-slate-950 p-3 rounded border border-slate-800 space-y-2">
-                    <p class="text-[9px] text-amber-400 leading-tight mb-2">Notice: Switch map base layer to "Blank Canvas (White)" before generating for a clean form output.</p>
-                    <button id="generate-pdf" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm py-2 rounded shadow transition-colors">
-                        Generate Official A4 PDF
-                    </button>
-                    <p id="pdf-status" class="text-[10px] text-amber-400 text-center hidden">Rendering document pipeline...</p>
-                </div>
-            </section>
+                <div class="bg-slate-950 p-3 rounded border border-slate-800 space-y-3">
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <select id="pdf-size" class="w-full bg-slate-800 text-xs text-white border border-slate-700 rounded px-2 py-1 outline-none">
+                            <option value="a4">A4 (210x297mm)</option>
+                            <option value="a3">A3 (297x420mm)</option>
+                            <option value="letter">Letter (216x279mm)</option>
+                            <option value="custom">Custom Size</option>
+                        </select>
+                        
+                        <select id="pdf-orientation" class="w-full bg-slate-800 text-xs text-white border border-slate-700 rounded px-2 py-1 outline-none">
+                            <option value="landscape">Landscape</option>
+                            <option value="portrait">Portrait</option>
+                        </select>
+                    </div>
 
-            <!-- Utility -->
-            <section>
-                <button id="export-geojson" class="w-full bg-emerald-900/40 hover:bg-emerald-800 text-emerald-400 border border-emerald-800 text-xs font-semibold py-2 rounded transition-colors mb-2">
-                    Export Raw GeoJSON
-                </button>
+                    <div id="custom-size-inputs" class="hidden grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] text-slate-500 uppercase">Width (mm)</label>
+                            <input type="number" id="custom-w" value="210" class="w-full bg-slate-800 text-xs text-white p-1 rounded border border-slate-700">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-500 uppercase">Height (mm)</label>
+                            <input type="number" id="custom-h" value="297" class="w-full bg-slate-800 text-xs text-white p-1 rounded border border-slate-700">
+                        </div>
+                    </div>
+
+                    <button id="generate-pdf" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm py-2 rounded shadow transition-colors">
+                        Generate PDF Layout
+                    </button>
+                    <p id="pdf-status" class="text-[10px] text-amber-400 text-center hidden">Calculating optimal bounds & rendering...</p>
+                </div>
             </section>
         </div>
     </aside>
 
     <!-- Interactive Map Container -->
     <main class="flex-1 relative bg-slate-950 h-full">
-        <!-- Sidebar Toggle Tab -->
         <button id="toggle-sidebar" class="absolute left-0 top-4 z-[999] bg-slate-800 border-y border-r border-slate-600 text-white p-2 rounded-r-md shadow-lg hover:bg-slate-700 transition-colors focus:outline-none" title="Toggle Console">
-            <!-- Icon when sidebar is open (Chevron Left) -->
             <svg id="icon-left" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
-            <!-- Icon when sidebar is closed (Chevron Right) -->
             <svg id="icon-right" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
         </button>
 
         <div id="map" class="w-full h-full"></div>
     </main>
 
-    <!-- Hidden Official Document Template for html2canvas -->
+    <!-- Hidden Template -->
     <div id="print-template">
         <div class="print-header">
             <h1>CENSUS OF INDIA 2027</h1>
@@ -193,173 +238,270 @@
         </div>
         
         <div class="print-body">
-            <!-- Left Metadata Sidebar -->
             <div class="print-sidebar">
-                <div class="code-row">
-                    <span>Name of State/UT:</span>
-                    <div class="code-boxes" id="render-state"></div>
-                </div>
-                <div class="code-row">
-                    <span>Name of District:</span>
-                    <div class="code-boxes" id="render-district"></div>
-                </div>
-                <div class="code-row">
-                    <span>Name of Tehsil:</span>
-                    <div class="code-boxes" id="render-tehsil"></div>
-                </div>
-                <div class="code-row">
-                    <span>Town/Village Code:</span>
-                    <div class="code-boxes" id="render-town"></div>
-                </div>
-                <div class="code-row" style="margin-top: 5mm; border-top: 1px solid #ccc; padding-top: 5mm;">
-                    <strong>Houselisting Block No:</strong>
-                    <div class="code-boxes" id="render-hlb"></div>
+                <div class="code-row"><span>State/UT:</span><div class="code-boxes" id="render-state"></div></div>
+                <div class="code-row"><span>District:</span><div class="code-boxes" id="render-district"></div></div>
+                <div class="code-row"><span>Tehsil:</span><div class="code-boxes" id="render-tehsil"></div></div>
+                <div class="code-row"><span>Town/Village:</span><div class="code-boxes" id="render-town"></div></div>
+                <div class="code-row" style="margin-top: 3mm; border-top: 1px solid #ccc; padding-top: 3mm;">
+                    <strong>HLB No:</strong><div class="code-boxes" id="render-hlb"></div>
                 </div>
 
-                <div style="margin-top: 10mm; font-size: 8pt; line-height: 1.4;">
+                <div style="margin-top: 5mm; font-size: 7pt; line-height: 1.5;">
                     <strong>LEGEND</strong><br>
-                    <span style="display:inline-block; width: 10px; height: 10px; border: 1px solid black; margin-right: 5px;"></span> Pucca Residential<br>
-                    <span style="display:inline-block; width: 10px; height: 10px; border: 1px solid black; background: repeating-linear-gradient(45deg, #000, #000 1px, #fff 1px, #fff 3px); margin-right: 5px;"></span> Pucca Non-Residential<br>
-                    <span style="display:inline-block; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 10px solid black; margin-right: 5px;"></span> Kutcha Residential<br>
-                    <span style="display:inline-block; width: 12px; height: 10px; border: 1px solid black; background: repeating-linear-gradient(45deg, #000, #000 1px, #fff 1px, #fff 3px); margin-right: 5px;"></span> Kutcha Non-Residential<br>
+                    <span style="display:inline-block; width: 8px; height: 8px; border: 1px solid black; margin-right: 3px;"></span> Pucca Res<br>
+                    <span style="display:inline-block; width: 8px; height: 8px; border: 1px solid black; background: repeating-linear-gradient(45deg, #000, #000 1px, #fff 1px, #fff 3px); margin-right: 3px;"></span> Pucca Non-Res<br>
+                    <span style="display:inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid black; margin-right: 3px;"></span> Kutcha Res<br>
+                    <span style="display:inline-block; width: 10px; height: 8px; border: 1px solid black; background: repeating-linear-gradient(45deg, #000, #000 1px, #fff 1px, #fff 3px); margin-right: 3px;"></span> Kutcha Non-Res<br>
+                    <span style="display:inline-block; width: 8px; height: 8px; border-radius: 50%; border: 1px solid black; margin-right: 3px;"></span> Other / Landmark<br>
+                    <span style="display:inline-block; width: 12px; height: 0; border-top: 2px solid black; margin-right: 3px; vertical-align: middle;"></span> Block Boundary
+                </div>
+
+                <div id="render-remarks" style="display:none; margin-top: 4mm; font-size: 7pt; line-height: 1.4; border-top: 1px dashed #999; padding-top: 2mm;">
+                    <strong>REMARKS</strong>
+                    <div id="render-remarks-list"></div>
                 </div>
             </div>
-
-            <!-- Right Map Injection Area -->
-            <div class="print-map-area" id="render-map-container">
-                <!-- Map screenshot will be injected here as an <img> tag -->
-            </div>
+            <div class="print-map-area" id="render-map-container"></div>
         </div>
 
         <div class="print-footer">
             <div class="signature-block">
                 <span id="render-enum-name" style="text-align: center; min-height: 15px; font-weight: bold;"></span>
-                <div class="signature-line">Name and Signature of Enumerator</div>
+                <div class="signature-line">Name/Signature of Enumerator</div>
             </div>
             <div class="signature-block">
                 <span style="min-height: 15px;"></span>
-                <div class="signature-line">Name and Signature of Supervisor</div>
+                <div class="signature-line">Name/Signature of Supervisor</div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- Sidebar Toggle Logic ---
+        // --- Sidebar & Layout Logic ---
         const sidebar = document.getElementById('sidebar');
         const toggleBtn = document.getElementById('toggle-sidebar');
-        const iconLeft = document.getElementById('icon-left');
-        const iconRight = document.getElementById('icon-right');
-
+        
         toggleBtn.addEventListener('click', () => {
-            // Toggle the negative margin to slide the sidebar out of view
             sidebar.classList.toggle('-ml-[340px]');
-            
-            // Toggle icons
-            iconLeft.classList.toggle('hidden');
-            iconRight.classList.toggle('hidden');
+            document.getElementById('icon-left').classList.toggle('hidden');
+            document.getElementById('icon-right').classList.toggle('hidden');
+            setTimeout(() => map.invalidateSize(), 300);
+        });
 
-            // Wait for CSS transition to complete before triggering map resize
-            setTimeout(() => {
-                map.invalidateSize();
-            }, 300);
+        document.getElementById('pdf-size').addEventListener('change', (e) => {
+            const customBlock = document.getElementById('custom-size-inputs');
+            if (e.target.value === 'custom') {
+                customBlock.classList.remove('hidden');
+                customBlock.classList.add('grid');
+            } else {
+                customBlock.classList.add('hidden');
+                customBlock.classList.remove('grid');
+            }
         });
 
         // --- Map Initialization ---
-        // Disable default zoom control to reposition it
         const map = L.map('map', { zoomControl: false }).setView([9.736, 76.518], 16);
-        
-        // Relocate built-in controls to prevent collision with sidebar toggle
         L.control.zoom({ position: 'bottomright' }).addTo(map);
         
         const osmStreet = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22, maxNativeZoom: 19, className: 'map-dark-mode' });
         const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 22, maxNativeZoom: 19, className: 'map-normal-mode' });
         const blankCanvas = L.tileLayer('', { maxZoom: 22, className: 'map-blank-mode' }); 
 
-        osmStreet.addTo(map);
-        L.control.layers({ 
-            "Street Map (OSM)": osmStreet, 
-            "Satellite (Esri)": esriSatellite,
-            "Blank Canvas (White)": blankCanvas 
-        }, null, { position: 'bottomleft' }).addTo(map);
+        blankCanvas.addTo(map); // Defaulting to blank canvas for optimal print behavior out of the box
+        L.control.layers({ "Street Map": osmStreet, "Satellite": esriSatellite, "Blank Canvas": blankCanvas }, null, { position: 'bottomleft' }).addTo(map);
 
-        // Reposition Geoman controls to top-right
         map.pm.addControls({
             position: 'topright', drawCircleMarker: false, drawCircle: false, cutPolygon: false,
             drawPolyline: true, drawRectangle: true, drawPolygon: true,
             editMode: true, dragMode: true, removalMode: true,
         });
 
-        // --- Data & Image Variables ---
+        // Default boundary/line drawing to plain black strokes to match the official B&W layout style
+        try {
+            map.pm.setGlobalOptions({
+                templineStyle: { color: '#000000', weight: 2 },
+                hintlineStyle: { color: '#000000', weight: 2, dashArray: [5, 5] },
+                pathOptions: { color: '#000000', weight: 2, fillOpacity: 0.04, fillColor: '#000000' }
+            });
+        } catch (err) {
+            console.warn('Could not set default draw style, library defaults will be used instead:', err);
+        }
+
+        // --- Data Variables ---
         let markersLayer = L.featureGroup().addTo(map);
         let imageOverlay = null;
+        let overlayHandles = [];
+        let loadedMarkerData = []; // Raw parsed JSON, kept around for the remarks/summary panel at PDF time
 
-        // JSON Plotting
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+        }
+
+        const TYPE_SHAPE_CLASS = { 'pucca-house': 'marker-pucca', 'kutcha-house': 'marker-kutcha', 'other-building': 'marker-other' };
+        const TYPE_HATCH_CLASS = { 'pucca-house': 'hatch-pucca', 'kutcha-house': 'hatch-kutcha', 'other-building': 'hatch-other' };
+
         document.getElementById('json-upload').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
+            const statusBox = document.getElementById('json-status');
             const reader = new FileReader();
             reader.onload = (event) => {
-                markersLayer.clearLayers();
-                const data = JSON.parse(event.target.result);
-                const bounds = [];
-                data.forEach(item => {
-                    if (!item.coords || item.coords.length !== 2) return;
-                    bounds.push([item.coords[0], item.coords[1]]);
+                statusBox.classList.remove('hidden');
+                try {
+                    const data = JSON.parse(event.target.result);
+                    if (!Array.isArray(data)) {
+                        throw new Error('File must contain a JSON array of marker objects.');
+                    }
 
-                    const isPucca = item.type === 'pucca-house';
-                    const isNR = item.subtype === 'nr';
-                    let shapeClass = 'census-shape ';
-                    shapeClass += isPucca ? 'marker-pucca ' : 'marker-kutcha ';
-                    if (isNR) shapeClass += isPucca ? 'hatch-pucca ' : 'hatch-kutcha ';
+                    markersLayer.clearLayers();
+                    loadedMarkerData = data;
 
-                    const htmlStr = `
-                        <div class="relative flex flex-col items-center justify-center">
-                            <div class="census-label">
-                                <div>${item.name || '?'}</div>
-                                <div class="census-label-divider"></div>
-                                <div>(${item.censusCount || 1})</div>
-                            </div>
-                            <div class="${shapeClass}"></div>
-                        </div>`;
+                    const bounds = [];
+                    const typeCounts = {};
+                    const nameCounts = {};
+                    let totalCensusCount = 0;
+                    let skippedCount = 0;
+                    let unknownTypeCount = 0;
 
-                    const icon = L.divIcon({ className: 'custom-icon-wrapper', html: htmlStr, iconSize: [24, 24], iconAnchor: [12, 12] });
-                    const marker = L.marker([item.coords[0], item.coords[1]], { icon });
-                    marker.feature = { type: "Feature", properties: { id: item.id, name: item.name }, geometry: { type: "Point", coordinates: [item.coords[1], item.coords[0]] }};
-                    marker.addTo(markersLayer);
-                });
-                if (bounds.length > 0) map.fitBounds(L.latLngBounds(bounds), { padding: [50, 50] });
+                    data.forEach(item => {
+                        const c = item && item.coords;
+                        if (!c || c.length !== 2 || typeof c[0] !== 'number' || typeof c[1] !== 'number') {
+                            skippedCount++;
+                            return;
+                        }
+                        bounds.push([c[0], c[1]]);
+
+                        // Anything that isn't a recognized type falls into "other" (visibly distinct) rather than
+                        // silently defaulting to the kutcha-house triangle, which misrepresents non-house structures.
+                        const isKnownType = TYPE_SHAPE_CLASS.hasOwnProperty(item.type);
+                        const resolvedType = isKnownType ? item.type : 'other-building';
+                        if (!isKnownType) unknownTypeCount++;
+                        typeCounts[resolvedType] = (typeCounts[resolvedType] || 0) + 1;
+
+                        const isNR = item.subtype === 'nr';
+                        let shapeClass = 'census-shape ' + TYPE_SHAPE_CLASS[resolvedType] + ' ';
+                        if (isNR) shapeClass += TYPE_HATCH_CLASS[resolvedType] + ' ';
+
+                        // Nullish coalescing (not ||) so an explicit censusCount of 0 (e.g. a transformer) stays 0
+                        const count = item.censusCount ?? 1;
+                        if (typeof count === 'number') totalCensusCount += count;
+
+                        const hasNote = !!(item.note && String(item.note).trim());
+                        if (item.name) nameCounts[item.name] = (nameCounts[item.name] || 0) + 1;
+
+                        const safeName = escapeHtml(item.name || '?');
+                        const safeNote = hasNote ? escapeHtml(item.note) : '';
+
+                        const htmlStr = `
+                            <div class="relative flex flex-col items-center justify-center"${hasNote ? ` title="${safeNote}"` : ''}>
+                                <div class="census-label">
+                                    <div>${safeName}</div>
+                                    <div class="census-label-divider"></div>
+                                    <div>(${count})${hasNote ? '*' : ''}</div>
+                                </div>
+                                <div class="${shapeClass}"></div>
+                            </div>`;
+
+                        const icon = L.divIcon({ className: 'custom-icon-wrapper', html: htmlStr, iconSize: [16, 16], iconAnchor: [8, 8] });
+                        const marker = L.marker([c[0], c[1]], { icon, pmIgnore: true });
+                        marker.addTo(markersLayer);
+                    });
+
+                    if (bounds.length > 0) map.fitBounds(L.latLngBounds(bounds), { padding: [20, 20] });
+
+                    const dupes = Object.entries(nameCounts).filter(([, n]) => n > 1).map(([n]) => n);
+
+                    let html = `<div class="text-emerald-400">&#10003; ${bounds.length} marker(s) loaded</div>`;
+                    html += `<div>Pucca: ${typeCounts['pucca-house'] || 0} &middot; Kutcha: ${typeCounts['kutcha-house'] || 0} &middot; Other: ${typeCounts['other-building'] || 0}</div>`;
+                    html += `<div>Total census count: ${totalCensusCount}</div>`;
+                    if (skippedCount > 0) html += `<div class="text-amber-400">&#9888; ${skippedCount} item(s) skipped &mdash; missing/invalid coordinates</div>`;
+                    if (unknownTypeCount > 0) html += `<div class="text-amber-400">&#9888; ${unknownTypeCount} item(s) had an unrecognized type, drawn as Other</div>`;
+                    if (dupes.length > 0) html += `<div class="text-amber-400">&#9888; Repeated house no.: ${dupes.map(escapeHtml).join(', ')} &mdash; please verify these aren't duplicates</div>`;
+                    statusBox.innerHTML = html;
+
+                } catch (err) {
+                    console.error('JSON load failed:', err);
+                    statusBox.innerHTML = `<div class="text-red-400">&#10007; Could not load file: ${escapeHtml(err.message)}</div>`;
+                }
+            };
+            reader.onerror = () => {
+                statusBox.classList.remove('hidden');
+                statusBox.innerHTML = `<div class="text-red-400">&#10007; Could not read the file.</div>`;
             };
             reader.readAsText(file);
         });
 
-        // Image Overlay
+        function clearOverlayHandles() {
+            overlayHandles.forEach(h => map.removeLayer(h));
+            overlayHandles = [];
+        }
+
+        // Two draggable corner handles let the user stretch/reposition the raw screenshot until it
+        // lines up with real features on the basemap -- a plain fixed-size overlay can't be trusted
+        // for boundary tracing since the screenshot's true ground footprint is unknown.
+        function addOverlayHandles(bounds) {
+            clearOverlayHandles();
+            const handleIcon = L.divIcon({
+                className: 'overlay-handle-wrapper',
+                html: '<div style="width:14px;height:14px;background:#f59e0b;border:2px solid #000;border-radius:50%;box-shadow:0 0 0 2px #fff;cursor:move;"></div>',
+                iconSize: [14, 14], iconAnchor: [7, 7]
+            });
+            const sw = L.marker(bounds.getSouthWest(), { icon: handleIcon, draggable: true, zIndexOffset: 2000, pmIgnore: true }).addTo(map);
+            const ne = L.marker(bounds.getNorthEast(), { icon: handleIcon, draggable: true, zIndexOffset: 2000, pmIgnore: true }).addTo(map);
+            const onDrag = () => {
+                if (!imageOverlay) return;
+                imageOverlay.setBounds(L.latLngBounds(sw.getLatLng(), ne.getLatLng()));
+            };
+            sw.on('drag', onDrag);
+            ne.on('drag', onDrag);
+            overlayHandles = [sw, ne];
+        }
+
+        function removeOverlay() {
+            if (imageOverlay) { map.removeLayer(imageOverlay); imageOverlay = null; }
+            clearOverlayHandles();
+            document.getElementById('overlay-controls').classList.add('hidden');
+            document.getElementById('image-upload').value = '';
+        }
+
         document.getElementById('image-upload').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = (event) => {
                 if (imageOverlay) map.removeLayer(imageOverlay);
+                clearOverlayHandles();
                 const tempImg = new Image();
                 tempImg.onload = () => {
                     const aspect = tempImg.width / tempImg.height;
                     const center = map.getCenter();
                     const latOff = 0.003; 
                     const bounds = L.latLngBounds([center.lat - latOff, center.lng - (latOff * aspect)], [center.lat + latOff, center.lng + (latOff * aspect)]);
-                    imageOverlay = L.imageOverlay(event.target.result, bounds, { opacity: 0.5 }).addTo(map);
+                    const initialOpacity = (parseInt(document.getElementById('overlay-opacity').value, 10) || 50) / 100;
+                    imageOverlay = L.imageOverlay(event.target.result, bounds, { opacity: initialOpacity, className: 'reference-overlay-img' }).addTo(map);
+                    addOverlayHandles(bounds);
+                    document.getElementById('overlay-controls').classList.remove('hidden');
                 };
                 tempImg.src = event.target.result;
             };
             reader.readAsDataURL(file);
         });
 
-        // --- Document Generation Pipeline ---
+        document.getElementById('overlay-opacity').addEventListener('input', (e) => {
+            const pct = parseInt(e.target.value, 10);
+            document.getElementById('opacity-value').textContent = pct + '%';
+            if (imageOverlay) imageOverlay.setOpacity(pct / 100);
+        });
+
+        document.getElementById('remove-overlay').addEventListener('click', removeOverlay);
+
+        // --- Strict Document Generation Pipeline ---
         function populateCodeBoxes(id, value, length) {
             const container = document.getElementById(id);
             container.innerHTML = '';
             const paddedValue = (value || '').padEnd(length, ' ');
-            for (let i = 0; i < length; i++) {
-                container.innerHTML += `<div class="code-box">${paddedValue[i]}</div>`;
-            }
+            for (let i = 0; i < length; i++) { container.innerHTML += `<div class="code-box">${paddedValue[i]}</div>`; }
         }
 
         document.getElementById('generate-pdf').addEventListener('click', async () => {
@@ -369,13 +511,44 @@
             const template = document.getElementById('print-template');
             const mapDest = document.getElementById('render-map-container');
 
+            // Paper Dimensions Dictionary (mm)
+            const sizes = {
+                'a4': { w: 210, h: 297 },
+                'a3': { w: 297, h: 420 },
+                'letter': { w: 215.9, h: 279.4 }
+            };
+
+            const sizeSelection = document.getElementById('pdf-size').value;
+            const orientation = document.getElementById('pdf-orientation').value;
+            
+            let pdfW, pdfH;
+            if (sizeSelection === 'custom') {
+                pdfW = parseFloat(document.getElementById('custom-w').value) || 210;
+                pdfH = parseFloat(document.getElementById('custom-h').value) || 297;
+            } else {
+                pdfW = sizes[sizeSelection].w;
+                pdfH = sizes[sizeSelection].h;
+                if (orientation === 'landscape') { const temp = pdfW; pdfW = pdfH; pdfH = temp; }
+            }
+
+            // Update template dimensions to match output exactly
+            template.style.width = `${pdfW}mm`;
+            template.style.height = `${pdfH}mm`;
+
             btn.disabled = true;
             status.classList.remove('hidden');
-            
-            // Add class to hide all map controls during capture
             document.body.classList.add('capturing-map');
 
             try {
+                // FORCE MAP BOUNDS calculation before capture
+                const dataBounds = markersLayer.getBounds();
+                if (dataBounds.isValid()) {
+                    // Force the map to hug the outermost coordinates tightly
+                    map.fitBounds(dataBounds, { padding: [20, 20] });
+                    // Provide deliberate delay for Leaflet to re-render grid and shapes
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                }
+
                 populateCodeBoxes('render-state', document.getElementById('meta-state').value, 2);
                 populateCodeBoxes('render-district', document.getElementById('meta-district').value, 2);
                 populateCodeBoxes('render-tehsil', document.getElementById('meta-tehsil').value, 4);
@@ -383,6 +556,7 @@
                 populateCodeBoxes('render-hlb', document.getElementById('meta-hlb').value, 4);
                 document.getElementById('render-enum-name').innerText = document.getElementById('meta-enum').value;
 
+                // Capture optimized viewport
                 const mapCanvas = await html2canvas(mapContainer, { useCORS: true, scale: 2, logging: false });
                 
                 mapDest.innerHTML = '';
@@ -395,9 +569,9 @@
                 template.style.zIndex = "-100"; 
                 
                 const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                const pdf = new jsPDF({ orientation: orientation, unit: 'mm', format: [pdfW, pdfH] });
                 
-                pdf.addImage(docCanvas.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, 297, 210);
+                pdf.addImage(docCanvas.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, pdfW, pdfH);
                 pdf.save(`Census_Official_Layout_${new Date().getTime()}.pdf`);
 
             } catch (error) {
@@ -408,20 +582,6 @@
                 status.classList.add('hidden');
                 document.body.classList.remove('capturing-map');
             }
-        });
-
-        // --- Utility ---
-        document.getElementById('export-geojson').addEventListener('click', () => {
-            const drawnLayers = map.pm.getGeomanDrawLayers();
-            const drawnGeoJSON = drawnLayers.length > 0 ? L.featureGroup(drawnLayers).toGeoJSON() : { type: "FeatureCollection", features: [] };
-            const markersGeoJSON = markersLayer.toGeoJSON();
-            const combinedGeoJSON = { type: "FeatureCollection", features: [...drawnGeoJSON.features, ...markersGeoJSON.features] };
-            
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(combinedGeoJSON, null, 2));
-            const dlNode = document.createElement('a');
-            dlNode.setAttribute("href", dataStr);
-            dlNode.setAttribute("download", "census_block.geojson");
-            document.body.appendChild(dlNode); dlNode.click(); dlNode.remove();
         });
     </script>
 </body>
