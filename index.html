@@ -20,38 +20,58 @@
 
         body, html { margin: 0; padding: 0; height: 100%; background-color: #020617; }
         
-        /* Dark Mode Map Adjustments */
         .leaflet-container { background: #0f172a !important; font-family: ui-sans-serif, system-ui, sans-serif; }
-        .leaflet-layer,
-        .leaflet-control-zoom-in,
-        .leaflet-control-zoom-out,
-        .leaflet-control-attribution {
-            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
-        }
+        
+        /* Dark Mode Map Inversion for OSM Street layer ONLY */
+        .map-dark-mode { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        /* Satellite layers should NOT be inverted */
+        .map-normal-mode { filter: none; }
 
-        /* Geoman Dark UI overrides */
         .button-container a { background-color: #1e293b !important; color: #cbd5e1 !important; border-color: #334155 !important; }
         .button-container a:hover { background-color: #334155 !important; }
 
-        /* Census Markers (Forced light colors for contrast against dark map) */
-        .census-marker {
+        /* Census Marker Base Physics */
+        .custom-icon-wrapper { pointer-events: none; } /* Let clicks pass to marker */
+        .census-shape {
             display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 10px; color: #000;
-            border: 2px solid #000; background: #fff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            border: 1.5px solid #000; background: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            position: relative;
+            z-index: 10;
         }
-        .marker-pucca { border-radius: 2px; }
-        .marker-kutcha { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); padding-top: 6px; }
-        .marker-nr { background: repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 2px, #fff 2px, #fff 4px); }
         
-        /* Custom UI Inputs */
+        .marker-pucca { width: 20px; height: 20px; border-radius: 1px; }
+        .marker-kutcha { 
+            width: 0; height: 0; 
+            border-left: 12px solid transparent; border-right: 12px solid transparent; border-bottom: 20px solid #000;
+            background: none !important; border: none !important; box-shadow: none !important; position: relative;
+        }
+        .marker-kutcha::after {
+            content: ''; position: absolute;
+            top: 2px; left: -10px; width: 0; height: 0;
+            border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 17px solid #fff;
+        }
+
+        /* Non-Residential Crosshatching */
+        .hatch-pucca { background: repeating-linear-gradient(45deg, #000, #000 1px, #fff 1px, #fff 3px) !important; }
+        .hatch-kutcha::after { border-bottom: 17px solid transparent; background: repeating-linear-gradient(45deg, #000, #000 1px, transparent 1px, transparent 3px); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+
+        /* Integrated Stacked Labels */
+        .census-label {
+            position: absolute; top: -28px; left: 50%; transform: translateX(-50%);
+            background: rgba(255,255,255,0.9); border: 1px solid #000;
+            color: #000; font-family: monospace; font-size: 10px; font-weight: bold;
+            line-height: 1; text-align: center; padding: 1px 3px; border-radius: 2px;
+            pointer-events: auto; z-index: 20; min-width: 24px;
+        }
+        .census-label-divider { border-top: 1px solid #000; margin: 1px 0; width: 100%; }
+        
         input[type=range] { accent-color: #3b82f6; }
     </style>
 </head>
 <body class="flex h-screen text-slate-300 antialiased overflow-hidden">
 
-    <!-- Sidebar UI -->
-    <aside class="w-80 bg-slate-900 border-r border-slate-800 shadow-2xl flex flex-col z-[1000]">
+    <aside class="w-[340px] bg-slate-900 border-r border-slate-800 shadow-2xl flex flex-col z-[1000]">
         <div class="p-5 border-b border-slate-800 bg-slate-950">
             <h1 class="text-xl font-bold text-white tracking-tight">Mapping Console</h1>
             <p class="text-xs text-slate-500 font-mono mt-1">OSM + GEOMAN ENGINE</p>
@@ -59,7 +79,6 @@
 
         <div class="flex-1 overflow-y-auto p-5 space-y-8">
             
-            <!-- Section 1: GeoJSON Data -->
             <section>
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">1. Structural Data</h2>
@@ -71,21 +90,22 @@
                 <div id="data-stats" class="text-xs text-indigo-400 mt-2 font-mono hidden bg-indigo-950/30 p-2 rounded border border-indigo-900/50"></div>
             </section>
 
-            <!-- Section 2: Overlay Image -->
             <section>
                 <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">2. Reference Overlay</h2>
+                
                 <label class="block w-full text-center bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold py-2.5 px-4 rounded border border-slate-700 cursor-pointer transition-colors duration-200 mb-4">
-                    Upload Map Image
+                    Upload Reference Image
                     <input type="file" id="image-upload" accept="image/*" class="hidden">
                 </label>
                 
                 <div id="image-controls" class="hidden flex-col gap-4 bg-slate-950 p-4 rounded-lg border border-slate-800 shadow-inner">
-                    <div class="flex justify-between items-center pb-2 border-b border-slate-800">
-                        <label class="text-sm font-medium text-slate-300">Visibility</label>
-                        <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
-                            <input type="checkbox" id="toggle-image" checked class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 border-slate-600 appearance-none cursor-pointer checked:right-0 checked:border-blue-500 transition-all duration-200" style="right: 20px; top: 0;">
-                            <label class="toggle-label block overflow-hidden h-5 rounded-full bg-slate-600 cursor-pointer"></label>
-                        </div>
+                    
+                    <div class="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-700">
+                        <span class="text-xs font-bold text-slate-300">Mode:</span>
+                        <select id="overlay-mode" class="bg-slate-800 text-xs text-white border border-slate-600 rounded px-2 py-1 outline-none">
+                            <option value="locked">🔒 Locked (Draw)</option>
+                            <option value="unlocked">🔓 Unlocked (Drag)</option>
+                        </select>
                     </div>
                     
                     <div class="space-y-1">
@@ -103,29 +123,20 @@
                         <input type="range" id="ctrl-rotate" min="-180" max="180" step="1" value="0" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
                     </div>
 
-                    <!-- Offset Controls -->
-                    <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
-                        <div class="space-y-1">
-                            <label class="text-[10px] text-slate-500 uppercase tracking-wide">Pan X</label>
-                            <input type="number" id="ctrl-pan-x" value="0" class="w-full bg-slate-800 text-xs text-white p-1 rounded border border-slate-700 font-mono text-center">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-[10px] text-slate-500 uppercase tracking-wide">Pan Y</label>
-                            <input type="number" id="ctrl-pan-y" value="0" class="w-full bg-slate-800 text-xs text-white p-1 rounded border border-slate-700 font-mono text-center">
-                        </div>
-                    </div>
+                    <button id="remove-overlay" class="mt-2 w-full bg-red-900/30 hover:bg-red-800 text-red-400 hover:text-white border border-red-900/50 text-xs py-1.5 rounded transition-colors">
+                        Remove Overlay
+                    </button>
                 </div>
             </section>
 
-            <!-- Section 3: Data Utilities -->
             <section>
                 <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">3. Utilities</h2>
                 <div class="space-y-2">
                     <button id="export-geojson" class="w-full bg-emerald-900/40 hover:bg-emerald-800 text-emerald-400 hover:text-emerald-300 border border-emerald-800 text-sm font-semibold py-2 px-4 rounded transition-colors flex items-center justify-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                        Export Drawn Boundaries
+                        Export Map GeoJSON
                     </button>
-                    <button id="clear-cache" class="w-full bg-red-900/20 hover:bg-red-900/50 text-red-400 border border-red-900/50 text-xs py-2 px-4 rounded transition-colors">
+                    <button id="clear-cache" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700 text-xs py-2 px-4 rounded transition-colors">
                         Reset Map Cache
                     </button>
                 </div>
@@ -133,60 +144,65 @@
         </div>
     </aside>
 
-    <!-- Map Container -->
     <main class="flex-1 relative bg-slate-950">
         <div id="map" class="w-full h-full"></div>
     </main>
 
     <script>
-        // --- Core Initialization ---
+        // --- Map & Base Layers Initialization ---
         const defaultCenter = [9.736, 76.518];
         let mapCenter = defaultCenter;
         let mapZoom = 16;
         
-        // Load persistent state
         const savedView = localStorage.getItem('censusUI_MapState');
         if (savedView) {
             try {
                 const state = JSON.parse(savedView);
                 if (state.center && state.zoom) {
-                    mapCenter = state.center;
-                    mapZoom = state.zoom;
+                    mapCenter = state.center; mapZoom = state.zoom;
                 }
-            } catch (e) { console.warn("Failed to parse map state cache."); }
+            } catch (e) {}
         }
 
         const map = L.map('map').setView(mapCenter, mapZoom);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 22,
-            maxNativeZoom: 19,
-            attribution: 'OSM | Census Mapping Tool'
-        }).addTo(map);
+        // Base Maps (Req 1)
+        const osmStreet = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 22, maxNativeZoom: 19, className: 'map-dark-mode'
+        });
+        
+        const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 22, maxNativeZoom: 19, className: 'map-normal-mode'
+        });
 
-        // Geoman Init
+        osmStreet.addTo(map); // Default
+        
+        const baseMaps = {
+            "Street Map (OSM)": osmStreet,
+            "Satellite (Esri)": esriSatellite
+        };
+        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+
         map.pm.addControls({
             position: 'topleft', drawCircleMarker: false, drawCircle: false, cutPolygon: false,
             drawPolyline: true, drawRectangle: true, drawPolygon: true,
             editMode: true, dragMode: true, removalMode: true,
         });
 
-        // Set persistent state on move
         map.on('moveend', () => {
             localStorage.setItem('censusUI_MapState', JSON.stringify({ center: map.getCenter(), zoom: map.getZoom() }));
         });
 
-        // --- Data Layer ---
-        let markersLayer = L.layerGroup().addTo(map);
+        // --- Data Layer & Label Rendering (Req 4) ---
+        let markersLayer = L.featureGroup().addTo(map);
 
         document.getElementById('json-upload').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = (event) => {
-                try {
-                    plotData(JSON.parse(event.target.result));
-                } catch (err) { alert("Invalid JSON Schema."); }
+                try { plotData(JSON.parse(event.target.result)); } 
+                catch (err) { alert("Invalid JSON Schema."); }
             };
             reader.readAsText(file);
         });
@@ -198,49 +214,61 @@
                 if (!item.coords || item.coords.length !== 2) return;
                 bounds.push([item.coords[0], item.coords[1]]);
 
-                let bClass = 'census-marker ';
-                if (item.type === 'pucca-house') bClass += 'marker-pucca ';
-                if (item.type === 'kutcha-house') bClass += 'marker-kutcha ';
-                if (item.subtype === 'nr') bClass += 'marker-nr ';
+                const isPucca = item.type === 'pucca-house';
+                const isNR = item.subtype === 'nr';
+                
+                let shapeClass = 'census-shape ';
+                shapeClass += isPucca ? 'marker-pucca ' : 'marker-kutcha ';
+                if (isNR) shapeClass += isPucca ? 'hatch-pucca ' : 'hatch-kutcha ';
+
+                // Stacked Label Format
+                const labelHTML = `
+                    <div class="census-label">
+                        <div>${item.name || '?'}</div>
+                        <div class="census-label-divider"></div>
+                        <div>(${item.censusCount || 1})</div>
+                    </div>
+                `;
+
+                const htmlStr = `<div class="relative flex flex-col items-center justify-center">
+                    ${labelHTML}
+                    <div class="${shapeClass}"></div>
+                </div>`;
 
                 const icon = L.divIcon({
                     className: 'custom-icon-wrapper',
-                    html: `<div class="${bClass}" style="width:24px; height:24px;">${item.name || ''}</div>`,
+                    html: htmlStr,
                     iconSize: [24, 24], iconAnchor: [12, 12]
                 });
 
-                L.marker([item.coords[0], item.coords[1]], { icon }).bindPopup(`
-                    <div class="text-slate-900 text-xs font-sans">
-                        <b>ID:</b> ${item.name}<br><b>Type:</b> ${item.type}<br><b>Houses:</b> ${item.censusCount}
-                    </div>
-                `).addTo(markersLayer);
+                const marker = L.marker([item.coords[0], item.coords[1]], { icon });
+                
+                // Attach raw data for exporting
+                marker.feature = {
+                    type: "Feature",
+                    properties: { id: item.id, name: item.name, count: item.censusCount, type: item.type, subtype: item.subtype, note: item.note },
+                    geometry: { type: "Point", coordinates: [item.coords[1], item.coords[0]] } // GeoJSON needs [lng, lat]
+                };
+
+                marker.addTo(markersLayer);
             });
 
             if (bounds.length > 0) {
                 map.fitBounds(L.latLngBounds(bounds), { padding: [50, 50] });
-                const stats = document.getElementById('data-stats');
-                stats.classList.remove('hidden');
-                stats.innerHTML = `Loaded [ ${bounds.length} ] Nodes`;
+                document.getElementById('data-stats').classList.remove('hidden');
+                document.getElementById('data-stats').innerHTML = `Loaded [ ${bounds.length} ] Nodes`;
             }
         }
 
-        // --- Integrated Image Overlay ---
+        // --- Image Overlay & Drag Physics (Req 2) ---
         let imageOverlay = null;
-        let baseBounds = null;
+        let originalBaseBounds = null; // Baseline calculated from aspect ratio
+        let currentBounds = null;      // Manipulated bounds
+        let imgAspect = 1;
         const imgControls = document.getElementById('image-controls');
         
-        let overlayState = {
-            url: null, opacity: 0.6, scale: 1, rotate: 0, panX: 0, panY: 0
-        };
-
-        // Cache recovery for image
-        const savedImage = localStorage.getItem('censusUI_ImageState');
-        if (savedImage) {
-            try {
-                overlayState = JSON.parse(savedImage);
-                if (overlayState.url) initializeImageOverlay();
-            } catch(e) {}
-        }
+        let overlayState = { url: null, opacity: 0.6, scale: 1, rotate: 0 };
+        let isImageUnlocked = false;
 
         document.getElementById('image-upload').addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -248,9 +276,15 @@
             const reader = new FileReader();
             reader.onload = (event) => {
                 overlayState.url = event.target.result;
-                overlayState.scale = 1; overlayState.rotate = 0; overlayState.panX = 0; overlayState.panY = 0;
-                initializeImageOverlay();
-                saveImageState();
+                overlayState.scale = 1; overlayState.rotate = 0;
+                
+                // Calculate actual aspect ratio
+                const tempImg = new Image();
+                tempImg.onload = () => {
+                    imgAspect = tempImg.width / tempImg.height;
+                    initializeImageOverlay();
+                };
+                tempImg.src = overlayState.url;
             };
             reader.readAsDataURL(file);
         });
@@ -258,36 +292,74 @@
         function initializeImageOverlay() {
             if (imageOverlay) map.removeLayer(imageOverlay);
             
-            // Generate arbitrary bounds centered on current map view
             const center = map.getCenter();
-            const offset = 0.005; // ~500 meters
-            baseBounds = L.latLngBounds([center.lat - offset, center.lng - offset], [center.lat + offset, center.lng + offset]);
+            const latOffset = 0.003; 
+            const lngOffset = latOffset * imgAspect; // Preserve ratio
+            
+            originalBaseBounds = L.latLngBounds(
+                [center.lat - latOffset, center.lng - lngOffset], 
+                [center.lat + latOffset, center.lng + lngOffset]
+            );
+            currentBounds = L.latLngBounds(originalBaseBounds.getSouthWest(), originalBaseBounds.getNorthEast());
 
-            imageOverlay = L.imageOverlay(overlayState.url, baseBounds, {
+            imageOverlay = L.imageOverlay(overlayState.url, currentBounds, {
                 opacity: overlayState.opacity,
-                interactive: false // Let mouse events pass through to map
+                interactive: false
             }).addTo(map);
 
             imgControls.classList.remove('hidden');
             imgControls.classList.add('flex');
             syncUI();
             updateOverlayTransform();
-            
-            // Re-apply rotation CSS on map zoom/pan as Leaflet redraws the image element
             map.on('moveend zoomend', applyCSSRotation);
         }
 
-        // Input Bindings
-        document.getElementById('toggle-image').addEventListener('change', (e) => {
-            if(!imageOverlay) return;
-            imageOverlay.setOpacity(e.target.checked ? overlayState.opacity : 0);
+        // Overlay Mode Switcher
+        document.getElementById('overlay-mode').addEventListener('change', (e) => {
+            isImageUnlocked = (e.target.value === 'unlocked');
+            if (isImageUnlocked) {
+                map.dragging.disable();
+                document.getElementById('overlay-mode').classList.add('border-yellow-500', 'text-yellow-400');
+            } else {
+                map.dragging.enable();
+                document.getElementById('overlay-mode').classList.remove('border-yellow-500', 'text-yellow-400');
+            }
         });
 
+        // Custom Map Drag Logic for Image
+        let isDraggingImg = false;
+        let dragStartPt = null;
+
+        map.on('mousedown', (e) => {
+            if (!isImageUnlocked || !imageOverlay || !currentBounds) return;
+            // Allow dragging if clicked anywhere on map while unlocked
+            isDraggingImg = true;
+            dragStartPt = e.latlng;
+        });
+
+        map.on('mousemove', (e) => {
+            if (!isDraggingImg || !isImageUnlocked) return;
+            
+            const dLat = e.latlng.lat - dragStartPt.lat;
+            const dLng = e.latlng.lng - dragStartPt.lng;
+            
+            // Shift baseline to maintain scale math integrity
+            originalBaseBounds = L.latLngBounds(
+                [originalBaseBounds.getSouth() + dLat, originalBaseBounds.getWest() + dLng],
+                [originalBaseBounds.getNorth() + dLat, originalBaseBounds.getEast() + dLng]
+            );
+            
+            updateOverlayTransform(); // Re-applies scale to new baseline
+            dragStartPt = e.latlng;
+        });
+
+        map.on('mouseup', () => { isDraggingImg = false; });
+
+        // Sliders
         document.getElementById('ctrl-opacity').addEventListener('input', (e) => {
             overlayState.opacity = parseFloat(e.target.value);
             document.getElementById('val-opacity').innerText = overlayState.opacity.toFixed(2);
-            if(imageOverlay && document.getElementById('toggle-image').checked) imageOverlay.setOpacity(overlayState.opacity);
-            saveImageState();
+            if(imageOverlay) imageOverlay.setOpacity(overlayState.opacity);
         });
 
         document.getElementById('ctrl-scale').addEventListener('input', (e) => {
@@ -300,48 +372,39 @@
             overlayState.rotate = parseInt(e.target.value);
             document.getElementById('val-rotate').innerText = overlayState.rotate + '°';
             applyCSSRotation();
-            saveImageState();
         });
 
-        document.getElementById('ctrl-pan-x').addEventListener('input', (e) => {
-            overlayState.panX = parseFloat(e.target.value) || 0;
-            updateOverlayTransform();
-        });
-
-        document.getElementById('ctrl-pan-y').addEventListener('input', (e) => {
-            overlayState.panY = parseFloat(e.target.value) || 0;
-            updateOverlayTransform();
+        document.getElementById('remove-overlay').addEventListener('click', () => {
+            if(imageOverlay) map.removeLayer(imageOverlay);
+            imgControls.classList.add('hidden');
+            imgControls.classList.remove('flex');
+            overlayState.url = null;
+            document.getElementById('overlay-mode').value = 'locked';
+            map.dragging.enable();
+            isImageUnlocked = false;
         });
 
         function updateOverlayTransform() {
-            if (!imageOverlay || !baseBounds) return;
+            if (!imageOverlay || !originalBaseBounds) return;
             
-            // Apply Scale and Pan via Leaflet Bounds logic (Mathematically rigorous)
-            const centerLat = baseBounds.getCenter().lat + (overlayState.panY * 0.0001);
-            const centerLng = baseBounds.getCenter().lng + (overlayState.panX * 0.0001);
+            const center = originalBaseBounds.getCenter();
+            const latSpan = (originalBaseBounds.getNorth() - originalBaseBounds.getSouth()) * overlayState.scale;
+            const lngSpan = (originalBaseBounds.getEast() - originalBaseBounds.getWest()) * overlayState.scale;
             
-            const latSpan = (baseBounds.getNorth() - baseBounds.getSouth()) * overlayState.scale;
-            const lngSpan = (baseBounds.getEast() - baseBounds.getWest()) * overlayState.scale;
-            
-            const newBounds = L.latLngBounds(
-                [centerLat - latSpan/2, centerLng - lngSpan/2],
-                [centerLat + latSpan/2, centerLng + lngSpan/2]
+            currentBounds = L.latLngBounds(
+                [center.lat - latSpan/2, center.lng - lngSpan/2],
+                [center.lat + latSpan/2, center.lng + lngSpan/2]
             );
             
-            imageOverlay.setBounds(newBounds);
+            imageOverlay.setBounds(currentBounds);
             applyCSSRotation();
-            saveImageState();
         }
 
         function applyCSSRotation() {
             if (!imageOverlay || !imageOverlay.getElement()) return;
             const imgEl = imageOverlay.getElement();
-            // Force transform origin to center, append rotation to existing Leaflet translates
             imgEl.style.transformOrigin = 'center center';
-            
-            // Clean previous rotate directives from style string
-            let transformStr = imgEl.style.transform;
-            transformStr = transformStr.replace(/ rotate\([^)]+\)/g, '');
+            let transformStr = imgEl.style.transform.replace(/ rotate\([^)]+\)/g, '');
             imgEl.style.transform = transformStr + ` rotate(${overlayState.rotate}deg)`;
         }
 
@@ -352,30 +415,32 @@
             document.getElementById('val-scale').innerText = overlayState.scale.toFixed(2);
             document.getElementById('ctrl-rotate').value = overlayState.rotate;
             document.getElementById('val-rotate').innerText = overlayState.rotate + '°';
-            document.getElementById('ctrl-pan-x').value = overlayState.panX;
-            document.getElementById('ctrl-pan-y').value = overlayState.panY;
         }
 
-        function saveImageState() {
-            try { localStorage.setItem('censusUI_ImageState', JSON.stringify(overlayState)); } 
-            catch(e) { console.warn("Image too large for local storage caching."); }
-        }
-
-        // --- Export & Reset Utilities ---
+        // --- Export (Req 3) ---
         document.getElementById('export-geojson').addEventListener('click', () => {
-            const layers = map.pm.getGeomanDrawLayers();
-            if (layers.length === 0) {
-                alert("No boundaries drawn to export.");
+            // Get boundaries from Geoman
+            const drawnLayers = map.pm.getGeomanDrawLayers();
+            const drawnGeoJSON = drawnLayers.length > 0 ? L.featureGroup(drawnLayers).toGeoJSON() : { type: "FeatureCollection", features: [] };
+            
+            // Get markers
+            const markersGeoJSON = markersLayer.toGeoJSON();
+
+            // Merge features regardless of boundary existence
+            const combinedGeoJSON = {
+                type: "FeatureCollection",
+                features: [...drawnGeoJSON.features, ...markersGeoJSON.features]
+            };
+
+            if(combinedGeoJSON.features.length === 0) {
+                alert("No structural data or boundaries available to export.");
                 return;
             }
             
-            const featureGroup = L.featureGroup(layers);
-            const geojson = featureGroup.toGeoJSON();
-            
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geojson, null, 2));
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(combinedGeoJSON, null, 2));
             const downloadAnchorNode = document.createElement('a');
-            downloadAnchorNode.setAttribute("href",     dataStr);
-            downloadAnchorNode.setAttribute("download", "census_boundaries_" + new Date().getTime() + ".geojson");
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "census_block_export_" + new Date().getTime() + ".geojson");
             document.body.appendChild(downloadAnchorNode);
             downloadAnchorNode.click();
             downloadAnchorNode.remove();
@@ -383,8 +448,7 @@
 
         document.getElementById('clear-cache').addEventListener('click', () => {
             localStorage.removeItem('censusUI_MapState');
-            localStorage.removeItem('censusUI_ImageState');
-            alert("Cache cleared. Hard reload (Ctrl+F5) to reset view.");
+            alert("Cache cleared. Reloading.");
             location.reload();
         });
     </script>
