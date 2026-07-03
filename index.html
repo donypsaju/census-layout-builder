@@ -20,7 +20,7 @@
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         
-        body, html { margin: 0; padding: 0; height: 100%; background-color: #020617; }
+        body, html { margin: 0; padding: 0; height: 100%; background-color: #020617; overflow: hidden; }
         
         .leaflet-container { background: #0f172a; font-family: ui-sans-serif, system-ui, sans-serif; }
         
@@ -88,13 +88,14 @@
         .signature-line { border-top: 1px solid black; text-align: center; font-size: 8pt; padding-top: 2px;}
 
         /* Hide specific UI elements during map screenshot capture */
-        .capturing-map .leaflet-control-container { display: none !important; }
+        .capturing-map .leaflet-control-container,
+        .capturing-map #toggle-sidebar { display: none !important; }
     </style>
 </head>
 <body class="flex h-screen text-slate-300 antialiased overflow-hidden">
 
-    <!-- UI Sidebar -->
-    <aside class="w-[340px] bg-slate-900 border-r border-slate-800 shadow-2xl flex flex-col z-[1000]">
+    <!-- Collapsible UI Sidebar -->
+    <aside id="sidebar" class="w-[340px] flex-shrink-0 bg-slate-900 border-r border-slate-800 shadow-2xl flex flex-col z-[1000] transition-all duration-300 transform translate-x-0 ml-0">
         <div class="p-4 border-b border-slate-800 bg-slate-950">
             <h1 class="text-lg font-bold text-white tracking-tight">Form Generator</h1>
         </div>
@@ -168,8 +169,16 @@
         </div>
     </aside>
 
-    <!-- Interactive Map -->
-    <main class="flex-1 relative bg-slate-950">
+    <!-- Interactive Map Container -->
+    <main class="flex-1 relative bg-slate-950 h-full">
+        <!-- Sidebar Toggle Tab -->
+        <button id="toggle-sidebar" class="absolute left-0 top-4 z-[999] bg-slate-800 border-y border-r border-slate-600 text-white p-2 rounded-r-md shadow-lg hover:bg-slate-700 transition-colors focus:outline-none" title="Toggle Console">
+            <!-- Icon when sidebar is open (Chevron Left) -->
+            <svg id="icon-left" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+            <!-- Icon when sidebar is closed (Chevron Right) -->
+            <svg id="icon-right" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+        </button>
+
         <div id="map" class="w-full h-full"></div>
     </main>
 
@@ -235,22 +244,47 @@
     </div>
 
     <script>
+        // --- Sidebar Toggle Logic ---
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.getElementById('toggle-sidebar');
+        const iconLeft = document.getElementById('icon-left');
+        const iconRight = document.getElementById('icon-right');
+
+        toggleBtn.addEventListener('click', () => {
+            // Toggle the negative margin to slide the sidebar out of view
+            sidebar.classList.toggle('-ml-[340px]');
+            
+            // Toggle icons
+            iconLeft.classList.toggle('hidden');
+            iconRight.classList.toggle('hidden');
+
+            // Wait for CSS transition to complete before triggering map resize
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 300);
+        });
+
         // --- Map Initialization ---
-        const map = L.map('map').setView([9.736, 76.518], 16);
+        // Disable default zoom control to reposition it
+        const map = L.map('map', { zoomControl: false }).setView([9.736, 76.518], 16);
+        
+        // Relocate built-in controls to prevent collision with sidebar toggle
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
         
         const osmStreet = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22, maxNativeZoom: 19, className: 'map-dark-mode' });
         const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 22, maxNativeZoom: 19, className: 'map-normal-mode' });
-        const blankCanvas = L.tileLayer('', { maxZoom: 22, className: 'map-blank-mode' }); // Solid White Layer for exporting
+        const blankCanvas = L.tileLayer('', { maxZoom: 22, className: 'map-blank-mode' }); 
 
         osmStreet.addTo(map);
         L.control.layers({ 
             "Street Map (OSM)": osmStreet, 
             "Satellite (Esri)": esriSatellite,
             "Blank Canvas (White)": blankCanvas 
-        }, null, { position: 'topright' }).addTo(map);
+        }, null, { position: 'bottomleft' }).addTo(map);
 
+        // Reposition Geoman controls to top-right
         map.pm.addControls({
-            position: 'topleft', drawCircleMarker: false, drawCircle: false, cutPolygon: false,
+            position: 'topright', drawCircleMarker: false, drawCircle: false, cutPolygon: false,
             drawPolyline: true, drawRectangle: true, drawPolygon: true,
             editMode: true, dragMode: true, removalMode: true,
         });
@@ -311,7 +345,6 @@
                     const center = map.getCenter();
                     const latOff = 0.003; 
                     const bounds = L.latLngBounds([center.lat - latOff, center.lng - (latOff * aspect)], [center.lat + latOff, center.lng + (latOff * aspect)]);
-                    // Added editing capability for overlay via Geoman
                     imageOverlay = L.imageOverlay(event.target.result, bounds, { opacity: 0.5 }).addTo(map);
                 };
                 tempImg.src = event.target.result;
@@ -338,10 +371,11 @@
 
             btn.disabled = true;
             status.classList.remove('hidden');
-            mapContainer.classList.add('capturing-map');
+            
+            // Add class to hide all map controls during capture
+            document.body.classList.add('capturing-map');
 
             try {
-                // 1. Populate Template Metadata
                 populateCodeBoxes('render-state', document.getElementById('meta-state').value, 2);
                 populateCodeBoxes('render-district', document.getElementById('meta-district').value, 2);
                 populateCodeBoxes('render-tehsil', document.getElementById('meta-tehsil').value, 4);
@@ -349,24 +383,17 @@
                 populateCodeBoxes('render-hlb', document.getElementById('meta-hlb').value, 4);
                 document.getElementById('render-enum-name').innerText = document.getElementById('meta-enum').value;
 
-                // 2. Capture isolated Leaflet map
                 const mapCanvas = await html2canvas(mapContainer, { useCORS: true, scale: 2, logging: false });
                 
-                // 3. Inject map into hidden template
                 mapDest.innerHTML = '';
                 const mapImg = new Image();
                 mapImg.src = mapCanvas.toDataURL('image/jpeg', 1.0);
                 mapDest.appendChild(mapImg);
 
-                // 4. Force template briefly visible for html2canvas to read computed styles, but off-screen
                 template.style.zIndex = "1000"; 
-                
-                // 5. Capture entire document template
                 const docCanvas = await html2canvas(template, { scale: 2, logging: false });
+                template.style.zIndex = "-100"; 
                 
-                template.style.zIndex = "-100"; // Re-hide template
-                
-                // 6. Generate PDF (A4 Landscape)
                 const { jsPDF } = window.jspdf;
                 const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
                 
@@ -379,7 +406,7 @@
             } finally {
                 btn.disabled = false;
                 status.classList.add('hidden');
-                mapContainer.classList.remove('capturing-map');
+                document.body.classList.remove('capturing-map');
             }
         });
 
