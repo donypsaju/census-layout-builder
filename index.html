@@ -5,14 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Census Mapping Matrix | Dark UI</title>
     
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet & Geoman -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
     <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
 
+    <!-- PDF Generation Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
     <style>
-        /* Modern Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
@@ -24,14 +30,13 @@
         
         /* Dark Mode Map Inversion for OSM Street layer ONLY */
         .map-dark-mode { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
-        /* Satellite layers should NOT be inverted */
         .map-normal-mode { filter: none; }
 
         .button-container a { background-color: #1e293b !important; color: #cbd5e1 !important; border-color: #334155 !important; }
         .button-container a:hover { background-color: #334155 !important; }
 
         /* Census Marker Base Physics */
-        .custom-icon-wrapper { pointer-events: none; } /* Let clicks pass to marker */
+        .custom-icon-wrapper { pointer-events: none; }
         .census-shape {
             display: flex; align-items: center; justify-content: center;
             border: 1.5px solid #000; background: #fff;
@@ -52,11 +57,9 @@
             border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 17px solid #fff;
         }
 
-        /* Non-Residential Crosshatching */
         .hatch-pucca { background: repeating-linear-gradient(45deg, #000, #000 1px, #fff 1px, #fff 3px) !important; }
         .hatch-kutcha::after { border-bottom: 17px solid transparent; background: repeating-linear-gradient(45deg, #000, #000 1px, transparent 1px, transparent 3px); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
 
-        /* Integrated Stacked Labels */
         .census-label {
             position: absolute; top: -28px; left: 50%; transform: translateX(-50%);
             background: rgba(255,255,255,0.9); border: 1px solid #000;
@@ -67,6 +70,10 @@
         .census-label-divider { border-top: 1px solid #000; margin: 1px 0; width: 100%; }
         
         input[type=range] { accent-color: #3b82f6; }
+
+        /* Hide specific UI elements during PDF generation */
+        .printing .leaflet-control-container .leaflet-top,
+        .printing .leaflet-control-container .leaflet-right { display: none !important; }
     </style>
 </head>
 <body class="flex h-screen text-slate-300 antialiased overflow-hidden">
@@ -74,16 +81,14 @@
     <aside class="w-[340px] bg-slate-900 border-r border-slate-800 shadow-2xl flex flex-col z-[1000]">
         <div class="p-5 border-b border-slate-800 bg-slate-950">
             <h1 class="text-xl font-bold text-white tracking-tight">Mapping Console</h1>
-            <p class="text-xs text-slate-500 font-mono mt-1">OSM + GEOMAN ENGINE</p>
+            <p class="text-xs text-slate-500 font-mono mt-1">OSM + GEOMAN + PDF</p>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-5 space-y-8">
+        <div class="flex-1 overflow-y-auto p-5 space-y-6">
             
             <section>
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">1. Structural Data</h2>
-                </div>
-                <label class="block w-full text-center bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold py-2.5 px-4 rounded shadow-lg cursor-pointer transition-colors duration-200">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">1. Structural Data</h2>
+                <label class="block w-full text-center bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold py-2 px-4 rounded cursor-pointer transition-colors">
                     Upload Block JSON
                     <input type="file" id="json-upload" accept=".json" class="hidden">
                 </label>
@@ -91,15 +96,13 @@
             </section>
 
             <section>
-                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">2. Reference Overlay</h2>
-                
-                <label class="block w-full text-center bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold py-2.5 px-4 rounded border border-slate-700 cursor-pointer transition-colors duration-200 mb-4">
-                    Upload Reference Image
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">2. Reference Overlay</h2>
+                <label class="block w-full text-center bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold py-2 px-4 rounded border border-slate-700 cursor-pointer transition-colors mb-3">
+                    Upload Map Image
                     <input type="file" id="image-upload" accept="image/*" class="hidden">
                 </label>
                 
-                <div id="image-controls" class="hidden flex-col gap-4 bg-slate-950 p-4 rounded-lg border border-slate-800 shadow-inner">
-                    
+                <div id="image-controls" class="hidden flex-col gap-3 bg-slate-950 p-3 rounded-lg border border-slate-800">
                     <div class="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-700">
                         <span class="text-xs font-bold text-slate-300">Mode:</span>
                         <select id="overlay-mode" class="bg-slate-800 text-xs text-white border border-slate-600 rounded px-2 py-1 outline-none">
@@ -109,31 +112,65 @@
                     </div>
                     
                     <div class="space-y-1">
-                        <label class="text-xs font-medium text-slate-400 flex justify-between">Opacity <span id="val-opacity" class="text-blue-400 font-mono">0.6</span></label>
-                        <input type="range" id="ctrl-opacity" min="0" max="1" step="0.05" value="0.6" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                        <label class="text-xs font-medium text-slate-400 flex justify-between">Opacity <span id="val-opacity">0.6</span></label>
+                        <input type="range" id="ctrl-opacity" min="0" max="1" step="0.05" value="0.6" class="w-full h-1 bg-slate-700 rounded-lg appearance-none">
                     </div>
                     
                     <div class="space-y-1">
-                        <label class="text-xs font-medium text-slate-400 flex justify-between">Scale <span id="val-scale" class="text-blue-400 font-mono">1.0</span></label>
-                        <input type="range" id="ctrl-scale" min="0.1" max="5" step="0.01" value="1" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                        <label class="text-xs font-medium text-slate-400 flex justify-between">Scale <span id="val-scale">1.0</span></label>
+                        <input type="range" id="ctrl-scale" min="0.1" max="5" step="0.01" value="1" class="w-full h-1 bg-slate-700 rounded-lg appearance-none">
                     </div>
                     
                     <div class="space-y-1">
-                        <label class="text-xs font-medium text-slate-400 flex justify-between">Rotation <span id="val-rotate" class="text-blue-400 font-mono">0°</span></label>
-                        <input type="range" id="ctrl-rotate" min="-180" max="180" step="1" value="0" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                        <label class="text-xs font-medium text-slate-400 flex justify-between">Rotate <span id="val-rotate">0°</span></label>
+                        <input type="range" id="ctrl-rotate" min="-180" max="180" step="1" value="0" class="w-full h-1 bg-slate-700 rounded-lg appearance-none">
                     </div>
 
-                    <button id="remove-overlay" class="mt-2 w-full bg-red-900/30 hover:bg-red-800 text-red-400 hover:text-white border border-red-900/50 text-xs py-1.5 rounded transition-colors">
-                        Remove Overlay
+                    <button id="remove-overlay" class="mt-1 w-full bg-red-900/30 hover:bg-red-800 text-red-400 hover:text-white border border-red-900/50 text-xs py-1.5 rounded transition-colors">
+                        Remove Image
                     </button>
                 </div>
             </section>
 
             <section>
-                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">3. Utilities</h2>
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">3. PDF Print Export</h2>
+                <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-3">
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <select id="pdf-size" class="w-full bg-slate-800 text-xs text-white border border-slate-700 rounded px-2 py-2 outline-none">
+                            <option value="a4">A4 (210 x 297 mm)</option>
+                            <option value="a3">A3 (297 x 420 mm)</option>
+                            <option value="custom">Custom Size</option>
+                        </select>
+                        
+                        <select id="pdf-orientation" class="w-full bg-slate-800 text-xs text-white border border-slate-700 rounded px-2 py-2 outline-none">
+                            <option value="landscape">Landscape</option>
+                            <option value="portrait">Portrait</option>
+                        </select>
+                    </div>
+
+                    <div id="custom-size-inputs" class="hidden grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] text-slate-500 uppercase">Width (mm)</label>
+                            <input type="number" id="custom-w" value="500" class="w-full bg-slate-800 text-xs text-white p-1.5 rounded border border-slate-700">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-500 uppercase">Height (mm)</label>
+                            <input type="number" id="custom-h" value="500" class="w-full bg-slate-800 text-xs text-white p-1.5 rounded border border-slate-700">
+                        </div>
+                    </div>
+
+                    <button id="generate-pdf" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm py-2 px-4 rounded shadow transition-colors flex items-center justify-center gap-2">
+                        Generate PDF
+                    </button>
+                    <p id="pdf-status" class="text-[10px] text-amber-400 text-center hidden">Processing image capture...</p>
+                </div>
+            </section>
+
+            <section>
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">4. Utilities</h2>
                 <div class="space-y-2">
-                    <button id="export-geojson" class="w-full bg-emerald-900/40 hover:bg-emerald-800 text-emerald-400 hover:text-emerald-300 border border-emerald-800 text-sm font-semibold py-2 px-4 rounded transition-colors flex items-center justify-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    <button id="export-geojson" class="w-full bg-emerald-900/40 hover:bg-emerald-800 text-emerald-400 hover:text-emerald-300 border border-emerald-800 text-sm font-semibold py-2 px-4 rounded transition-colors">
                         Export Map GeoJSON
                     </button>
                     <button id="clear-cache" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700 text-xs py-2 px-4 rounded transition-colors">
@@ -149,7 +186,7 @@
     </main>
 
     <script>
-        // --- Map & Base Layers Initialization ---
+        // --- Map Initialization ---
         const defaultCenter = [9.736, 76.518];
         let mapCenter = defaultCenter;
         let mapZoom = 16;
@@ -166,7 +203,9 @@
 
         const map = L.map('map').setView(mapCenter, mapZoom);
 
-        // Base Maps (Req 1)
+        // Required for scaling physical prints
+        L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
+
         const osmStreet = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 22, maxNativeZoom: 19, className: 'map-dark-mode'
         });
@@ -175,13 +214,9 @@
             maxZoom: 22, maxNativeZoom: 19, className: 'map-normal-mode'
         });
 
-        osmStreet.addTo(map); // Default
+        osmStreet.addTo(map);
         
-        const baseMaps = {
-            "Street Map (OSM)": osmStreet,
-            "Satellite (Esri)": esriSatellite
-        };
-        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+        L.control.layers({ "Street Map (OSM)": osmStreet, "Satellite (Esri)": esriSatellite }, null, { position: 'topright' }).addTo(map);
 
         map.pm.addControls({
             position: 'topleft', drawCircleMarker: false, drawCircle: false, cutPolygon: false,
@@ -193,7 +228,7 @@
             localStorage.setItem('censusUI_MapState', JSON.stringify({ center: map.getCenter(), zoom: map.getZoom() }));
         });
 
-        // --- Data Layer & Label Rendering (Req 4) ---
+        // --- Data Layer ---
         let markersLayer = L.featureGroup().addTo(map);
 
         document.getElementById('json-upload').addEventListener('change', (e) => {
@@ -221,7 +256,6 @@
                 shapeClass += isPucca ? 'marker-pucca ' : 'marker-kutcha ';
                 if (isNR) shapeClass += isPucca ? 'hatch-pucca ' : 'hatch-kutcha ';
 
-                // Stacked Label Format
                 const labelHTML = `
                     <div class="census-label">
                         <div>${item.name || '?'}</div>
@@ -235,21 +269,14 @@
                     <div class="${shapeClass}"></div>
                 </div>`;
 
-                const icon = L.divIcon({
-                    className: 'custom-icon-wrapper',
-                    html: htmlStr,
-                    iconSize: [24, 24], iconAnchor: [12, 12]
-                });
-
-                const marker = L.marker([item.coords[0], item.coords[1]], { icon });
+                const icon = L.divIcon({ className: 'custom-icon-wrapper', html: htmlStr, iconSize: [24, 24], iconAnchor: [12, 12] });
                 
-                // Attach raw data for exporting
+                const marker = L.marker([item.coords[0], item.coords[1]], { icon });
                 marker.feature = {
                     type: "Feature",
-                    properties: { id: item.id, name: item.name, count: item.censusCount, type: item.type, subtype: item.subtype, note: item.note },
-                    geometry: { type: "Point", coordinates: [item.coords[1], item.coords[0]] } // GeoJSON needs [lng, lat]
+                    properties: { id: item.id, name: item.name, count: item.censusCount, type: item.type, subtype: item.subtype },
+                    geometry: { type: "Point", coordinates: [item.coords[1], item.coords[0]] }
                 };
-
                 marker.addTo(markersLayer);
             });
 
@@ -260,10 +287,10 @@
             }
         }
 
-        // --- Image Overlay & Drag Physics (Req 2) ---
+        // --- Image Overlay Physics ---
         let imageOverlay = null;
-        let originalBaseBounds = null; // Baseline calculated from aspect ratio
-        let currentBounds = null;      // Manipulated bounds
+        let originalBaseBounds = null;
+        let currentBounds = null;
         let imgAspect = 1;
         const imgControls = document.getElementById('image-controls');
         
@@ -278,7 +305,6 @@
                 overlayState.url = event.target.result;
                 overlayState.scale = 1; overlayState.rotate = 0;
                 
-                // Calculate actual aspect ratio
                 const tempImg = new Image();
                 tempImg.onload = () => {
                     imgAspect = tempImg.width / tempImg.height;
@@ -294,18 +320,12 @@
             
             const center = map.getCenter();
             const latOffset = 0.003; 
-            const lngOffset = latOffset * imgAspect; // Preserve ratio
+            const lngOffset = latOffset * imgAspect; 
             
-            originalBaseBounds = L.latLngBounds(
-                [center.lat - latOffset, center.lng - lngOffset], 
-                [center.lat + latOffset, center.lng + lngOffset]
-            );
+            originalBaseBounds = L.latLngBounds([center.lat - latOffset, center.lng - lngOffset], [center.lat + latOffset, center.lng + lngOffset]);
             currentBounds = L.latLngBounds(originalBaseBounds.getSouthWest(), originalBaseBounds.getNorthEast());
 
-            imageOverlay = L.imageOverlay(overlayState.url, currentBounds, {
-                opacity: overlayState.opacity,
-                interactive: false
-            }).addTo(map);
+            imageOverlay = L.imageOverlay(overlayState.url, currentBounds, { opacity: overlayState.opacity, interactive: false }).addTo(map);
 
             imgControls.classList.remove('hidden');
             imgControls.classList.add('flex');
@@ -314,7 +334,6 @@
             map.on('moveend zoomend', applyCSSRotation);
         }
 
-        // Overlay Mode Switcher
         document.getElementById('overlay-mode').addEventListener('change', (e) => {
             isImageUnlocked = (e.target.value === 'unlocked');
             if (isImageUnlocked) {
@@ -326,36 +345,29 @@
             }
         });
 
-        // Custom Map Drag Logic for Image
         let isDraggingImg = false;
         let dragStartPt = null;
 
         map.on('mousedown', (e) => {
             if (!isImageUnlocked || !imageOverlay || !currentBounds) return;
-            // Allow dragging if clicked anywhere on map while unlocked
-            isDraggingImg = true;
-            dragStartPt = e.latlng;
+            isDraggingImg = true; dragStartPt = e.latlng;
         });
 
         map.on('mousemove', (e) => {
             if (!isDraggingImg || !isImageUnlocked) return;
-            
             const dLat = e.latlng.lat - dragStartPt.lat;
             const dLng = e.latlng.lng - dragStartPt.lng;
             
-            // Shift baseline to maintain scale math integrity
             originalBaseBounds = L.latLngBounds(
                 [originalBaseBounds.getSouth() + dLat, originalBaseBounds.getWest() + dLng],
                 [originalBaseBounds.getNorth() + dLat, originalBaseBounds.getEast() + dLng]
             );
-            
-            updateOverlayTransform(); // Re-applies scale to new baseline
+            updateOverlayTransform();
             dragStartPt = e.latlng;
         });
 
         map.on('mouseup', () => { isDraggingImg = false; });
 
-        // Sliders
         document.getElementById('ctrl-opacity').addEventListener('input', (e) => {
             overlayState.opacity = parseFloat(e.target.value);
             document.getElementById('val-opacity').innerText = overlayState.opacity.toFixed(2);
@@ -386,16 +398,10 @@
 
         function updateOverlayTransform() {
             if (!imageOverlay || !originalBaseBounds) return;
-            
             const center = originalBaseBounds.getCenter();
             const latSpan = (originalBaseBounds.getNorth() - originalBaseBounds.getSouth()) * overlayState.scale;
             const lngSpan = (originalBaseBounds.getEast() - originalBaseBounds.getWest()) * overlayState.scale;
-            
-            currentBounds = L.latLngBounds(
-                [center.lat - latSpan/2, center.lng - lngSpan/2],
-                [center.lat + latSpan/2, center.lng + lngSpan/2]
-            );
-            
+            currentBounds = L.latLngBounds([center.lat - latSpan/2, center.lng - lngSpan/2], [center.lat + latSpan/2, center.lng + lngSpan/2]);
             imageOverlay.setBounds(currentBounds);
             applyCSSRotation();
         }
@@ -409,47 +415,129 @@
         }
 
         function syncUI() {
-            document.getElementById('ctrl-opacity').value = overlayState.opacity;
-            document.getElementById('val-opacity').innerText = overlayState.opacity.toFixed(2);
-            document.getElementById('ctrl-scale').value = overlayState.scale;
-            document.getElementById('val-scale').innerText = overlayState.scale.toFixed(2);
-            document.getElementById('ctrl-rotate').value = overlayState.rotate;
-            document.getElementById('val-rotate').innerText = overlayState.rotate + '°';
+            document.getElementById('ctrl-opacity').value = overlayState.opacity; document.getElementById('val-opacity').innerText = overlayState.opacity.toFixed(2);
+            document.getElementById('ctrl-scale').value = overlayState.scale; document.getElementById('val-scale').innerText = overlayState.scale.toFixed(2);
+            document.getElementById('ctrl-rotate').value = overlayState.rotate; document.getElementById('val-rotate').innerText = overlayState.rotate + '°';
         }
 
-        // --- Export (Req 3) ---
-        document.getElementById('export-geojson').addEventListener('click', () => {
-            // Get boundaries from Geoman
-            const drawnLayers = map.pm.getGeomanDrawLayers();
-            const drawnGeoJSON = drawnLayers.length > 0 ? L.featureGroup(drawnLayers).toGeoJSON() : { type: "FeatureCollection", features: [] };
-            
-            // Get markers
-            const markersGeoJSON = markersLayer.toGeoJSON();
+        // --- PDF Generation ---
+        const pdfSizeSelect = document.getElementById('pdf-size');
+        const customSizeInputs = document.getElementById('custom-size-inputs');
 
-            // Merge features regardless of boundary existence
-            const combinedGeoJSON = {
-                type: "FeatureCollection",
-                features: [...drawnGeoJSON.features, ...markersGeoJSON.features]
+        pdfSizeSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'custom') {
+                customSizeInputs.classList.remove('hidden');
+                customSizeInputs.classList.add('grid');
+            } else {
+                customSizeInputs.classList.add('hidden');
+                customSizeInputs.classList.remove('grid');
+            }
+        });
+
+        document.getElementById('generate-pdf').addEventListener('click', async () => {
+            const btn = document.getElementById('generate-pdf');
+            const status = document.getElementById('pdf-status');
+            const mapContainer = document.getElementById('map');
+
+            // Paper Dimensions Dictionary (mm)
+            const sizes = {
+                'a4': { w: 210, h: 297 },
+                'a3': { w: 297, h: 420 }
             };
 
-            if(combinedGeoJSON.features.length === 0) {
-                alert("No structural data or boundaries available to export.");
-                return;
+            const sizeSelection = pdfSizeSelect.value;
+            const orientation = document.getElementById('pdf-orientation').value;
+            
+            let pdfW, pdfH;
+            if (sizeSelection === 'custom') {
+                pdfW = parseFloat(document.getElementById('custom-w').value) || 210;
+                pdfH = parseFloat(document.getElementById('custom-h').value) || 297;
+                // Custom ignores orientation select, trusts user input
+            } else {
+                pdfW = sizes[sizeSelection].w;
+                pdfH = sizes[sizeSelection].h;
+                if (orientation === 'landscape') {
+                    const temp = pdfW; pdfW = pdfH; pdfH = temp;
+                }
             }
+
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            status.classList.remove('hidden');
+            mapContainer.classList.add('printing'); // Hides Leaflet UI controls
+
+            try {
+                // html2canvas configuration requires useCORS to pull external map tiles
+                const canvas = await html2canvas(mapContainer, {
+                    useCORS: true,
+                    allowTaint: false,
+                    scale: 2, // Boost resolution capture
+                    logging: false
+                });
+
+                const imgData = canvas.toDataURL('image/jpeg', 1.0);
+                
+                // Initialize jsPDF
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({
+                    orientation: pdfW > pdfH ? 'landscape' : 'portrait',
+                    unit: 'mm',
+                    format: [pdfW, pdfH]
+                });
+
+                // Margin logic: 5mm margins. Calculate aspect ratios to expand image maximally
+                const margin = 5; 
+                const maxW = pdfW - (margin * 2);
+                const maxH = pdfH - (margin * 2);
+
+                const canvasAspect = canvas.width / canvas.height;
+                const pageAspect = maxW / maxH;
+
+                let finalW, finalH;
+                if (canvasAspect > pageAspect) {
+                    finalW = maxW;
+                    finalH = maxW / canvasAspect;
+                } else {
+                    finalH = maxH;
+                    finalW = maxH * canvasAspect;
+                }
+
+                // Center on page
+                const x = margin + (maxW - finalW) / 2;
+                const y = margin + (maxH - finalH) / 2;
+
+                doc.addImage(imgData, 'JPEG', x, y, finalW, finalH);
+                doc.save(`Census_Map_Export_${new Date().getTime()}.pdf`);
+
+            } catch (error) {
+                console.error("PDF Generation failed:", error);
+                alert("Failed to generate PDF. Check console for CORS or rendering errors.");
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                status.classList.add('hidden');
+                mapContainer.classList.remove('printing');
+            }
+        });
+
+        // --- Export & Utilities ---
+        document.getElementById('export-geojson').addEventListener('click', () => {
+            const drawnLayers = map.pm.getGeomanDrawLayers();
+            const drawnGeoJSON = drawnLayers.length > 0 ? L.featureGroup(drawnLayers).toGeoJSON() : { type: "FeatureCollection", features: [] };
+            const markersGeoJSON = markersLayer.toGeoJSON();
+
+            const combinedGeoJSON = { type: "FeatureCollection", features: [...drawnGeoJSON.features, ...markersGeoJSON.features] };
+            if(combinedGeoJSON.features.length === 0) { alert("No data."); return; }
             
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(combinedGeoJSON, null, 2));
-            const downloadAnchorNode = document.createElement('a');
-            downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", "census_block_export_" + new Date().getTime() + ".geojson");
-            document.body.appendChild(downloadAnchorNode);
-            downloadAnchorNode.click();
-            downloadAnchorNode.remove();
+            const dlNode = document.createElement('a');
+            dlNode.setAttribute("href", dataStr);
+            dlNode.setAttribute("download", "census_block.geojson");
+            document.body.appendChild(dlNode); dlNode.click(); dlNode.remove();
         });
 
         document.getElementById('clear-cache').addEventListener('click', () => {
-            localStorage.removeItem('censusUI_MapState');
-            alert("Cache cleared. Reloading.");
-            location.reload();
+            localStorage.removeItem('censusUI_MapState'); location.reload();
         });
     </script>
 </body>
