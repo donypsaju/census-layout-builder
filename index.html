@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
     <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
 
-    <!-- PDF -->
+    <!-- PDF Dependencies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -55,7 +55,7 @@
         .marker-other { width: 15px; height: 15px; border-radius: 50%; }
         .hatch-other { background: repeating-linear-gradient(45deg, #000, #000 1px, #fff 1px, #fff 3px) !important; }
 
-        /* Optional decluttering for dense blocks: hide number/count tags, keep shapes only */
+        /* Label hide/show */
         body.hide-labels .census-label { display: none; }
 
         .census-label {
@@ -88,13 +88,13 @@
         .code-box { width: 12px; height: 12px; border: 1px solid black; display: flex; align-items: center; justify-content: center; font-family: monospace; font-weight: bold;}
         
         .print-map-area { flex: 1; border: 2px solid black; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #fff;}
-        .print-map-area img { width: 100%; height: 100%; object-fit: cover; } /* Forced cover to eliminate margins */
+        .print-map-area img { width: 100%; height: 100%; object-fit: fill; } /* No cropping, aspect ratio matched */
 
         .print-footer { margin-top: 4mm; display: flex; justify-content: space-between; font-size: 9pt; border-top: 1px dashed black; padding-top: 4mm;}
         .signature-block { display: flex; flex-direction: column; gap: 6mm; width: 50mm;}
         .signature-line { border-top: 1px solid black; text-align: center; font-size: 7pt; padding-top: 2px;}
 
-        /* Isolation classes */
+        /* Isolation classes for PDF capture */
         .capturing-map .leaflet-control-container,
         .capturing-map #toggle-sidebar,
         .capturing-map .overlay-handle-wrapper { display: none !important; }
@@ -308,8 +308,11 @@
         const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 22, maxNativeZoom: 19, className: 'map-normal-mode' });
         const blankCanvas = L.tileLayer('', { maxZoom: 22, className: 'map-blank-mode' }); 
 
-        blankCanvas.addTo(map); // Defaulting to blank canvas for optimal print behavior out of the box
+        blankCanvas.addTo(map); // Defaulting to blank canvas for optimal print behavior
         L.control.layers({ "Street Map": osmStreet, "Satellite": esriSatellite, "Blank Canvas": blankCanvas }, null, { position: 'bottomleft' }).addTo(map);
+
+        // Group for user‑drawn shapes (boundary, roads) so we can include them in bounds
+        const drawnItems = L.featureGroup().addTo(map);
 
         map.pm.addControls({
             position: 'topright', drawCircleMarker: false, drawCircle: false, cutPolygon: false,
@@ -317,22 +320,19 @@
             editMode: true, dragMode: true, removalMode: true,
         });
 
-        // Default boundary/line drawing to plain black strokes to match the official B&W layout style
-        try {
-            map.pm.setGlobalOptions({
-                templineStyle: { color: '#000000', weight: 2 },
-                hintlineStyle: { color: '#000000', weight: 2, dashArray: [5, 5] },
-                pathOptions: { color: '#000000', weight: 2, fillOpacity: 0.04, fillColor: '#000000' }
-            });
-        } catch (err) {
-            console.warn('Could not set default draw style, library defaults will be used instead:', err);
-        }
+        // Route all Geoman drawings into our dedicated feature group
+        map.pm.setGlobalOptions({
+            layerGroup: drawnItems,
+            templineStyle: { color: '#000000', weight: 2 },
+            hintlineStyle: { color: '#000000', weight: 2, dashArray: [5, 5] },
+            pathOptions: { color: '#000000', weight: 2, fillOpacity: 0.04, fillColor: '#000000' }
+        });
 
         // --- Data Variables ---
         let markersLayer = L.featureGroup().addTo(map);
         let imageOverlay = null;
         let overlayHandles = [];
-        let loadedMarkerData = []; // Raw parsed JSON, kept around for the remarks/summary panel at PDF time
+        let loadedMarkerData = []; // Raw parsed JSON, kept for remarks
 
         function escapeHtml(str) {
             return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
@@ -340,6 +340,11 @@
 
         const TYPE_SHAPE_CLASS = { 'pucca-house': 'marker-pucca', 'kutcha-house': 'marker-kutcha', 'other-building': 'marker-other' };
         const TYPE_HATCH_CLASS = { 'pucca-house': 'hatch-pucca', 'kutcha-house': 'hatch-kutcha', 'other-building': 'hatch-other' };
+
+        // Label toggle (checkbox vs. CSS class)
+        document.getElementById('toggle-labels').addEventListener('change', (e) => {
+            document.body.classList.toggle('hide-labels', !e.target.checked);
+        });
 
         document.getElementById('json-upload').addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -372,8 +377,6 @@
                         }
                         bounds.push([c[0], c[1]]);
 
-                        // Anything that isn't a recognized type falls into "other" (visibly distinct) rather than
-                        // silently defaulting to the kutcha-house triangle, which misrepresents non-house structures.
                         const isKnownType = TYPE_SHAPE_CLASS.hasOwnProperty(item.type);
                         const resolvedType = isKnownType ? item.type : 'other-building';
                         if (!isKnownType) unknownTypeCount++;
@@ -383,7 +386,6 @@
                         let shapeClass = 'census-shape ' + TYPE_SHAPE_CLASS[resolvedType] + ' ';
                         if (isNR) shapeClass += TYPE_HATCH_CLASS[resolvedType] + ' ';
 
-                        // Nullish coalescing (not ||) so an explicit censusCount of 0 (e.g. a transformer) stays 0
                         const count = item.censusCount ?? 1;
                         if (typeof count === 'number') totalCensusCount += count;
 
@@ -417,7 +419,7 @@
                     html += `<div>Total census count: ${totalCensusCount}</div>`;
                     if (skippedCount > 0) html += `<div class="text-amber-400">&#9888; ${skippedCount} item(s) skipped &mdash; missing/invalid coordinates</div>`;
                     if (unknownTypeCount > 0) html += `<div class="text-amber-400">&#9888; ${unknownTypeCount} item(s) had an unrecognized type, drawn as Other</div>`;
-                    if (dupes.length > 0) html += `<div class="text-amber-400">&#9888; Repeated house no.: ${dupes.map(escapeHtml).join(', ')} &mdash; please verify these aren't duplicates</div>`;
+                    if (dupes.length > 0) html += `<div class="text-amber-400">&#9888; Repeated house no.: ${dupes.map(escapeHtml).join(', ')} &mdash; please verify</div>`;
                     statusBox.innerHTML = html;
 
                 } catch (err) {
@@ -437,9 +439,6 @@
             overlayHandles = [];
         }
 
-        // Two draggable corner handles let the user stretch/reposition the raw screenshot until it
-        // lines up with real features on the basemap -- a plain fixed-size overlay can't be trusted
-        // for boundary tracing since the screenshot's true ground footprint is unknown.
         function addOverlayHandles(bounds) {
             clearOverlayHandles();
             const handleIcon = L.divIcon({
@@ -528,7 +527,11 @@
             } else {
                 pdfW = sizes[sizeSelection].w;
                 pdfH = sizes[sizeSelection].h;
-                if (orientation === 'landscape') { const temp = pdfW; pdfW = pdfH; pdfH = temp; }
+            }
+
+            // Apply orientation swap for both custom and preset sizes
+            if (orientation === 'landscape') {
+                [pdfW, pdfH] = [pdfH, pdfW];
             }
 
             // Update template dimensions to match output exactly
@@ -540,15 +543,69 @@
             document.body.classList.add('capturing-map');
 
             try {
-                // FORCE MAP BOUNDS calculation before capture
-                const dataBounds = markersLayer.getBounds();
-                if (dataBounds.isValid()) {
-                    // Force the map to hug the outermost coordinates tightly
-                    map.fitBounds(dataBounds, { padding: [20, 20] });
-                    // Provide deliberate delay for Leaflet to re-render grid and shapes
+                // Compute combined bounds: markers + drawn shapes
+                const mBounds = markersLayer.getBounds();
+                const dBounds = drawnItems.getBounds();
+                let fullBounds = null;
+                if (mBounds.isValid()) fullBounds = mBounds;
+                if (dBounds.isValid()) {
+                    fullBounds = fullBounds ? fullBounds.extend(dBounds) : dBounds;
+                }
+                if (fullBounds) {
+                    map.fitBounds(fullBounds, { padding: [20, 20] });
                     await new Promise(resolve => setTimeout(resolve, 800));
                 }
 
+                // Resize map container to match target print-map-area aspect ratio
+                // Compute target aspect ratio of the map area inside template
+                const sidebarWidth = 60; // mm
+                const gap = 4; // mm
+                const padding = 8 * 2; // 8mm on each side of template
+                const templateInnerW = pdfW - padding;
+                const mapAreaW = templateInnerW - sidebarWidth - gap;
+                const mapAreaH = pdfH - padding - /* header + footer approx */ 30; // rough, but we just need aspect ratio
+                // Actually the map area height is the whole print-body height, which fills remaining space.
+                // Simpler: use the paper dimensions directly; print-map-area's container is the same height as the body.
+                // We'll compute aspect from the known widths ignoring exact vertical padding for simplicity.
+                // Let's compute width/height from the outer container.
+                const targetAspect = mapAreaW / mapAreaH;
+                
+                // Get current map container height, set width to match aspect
+                const originalWidth = mapContainer.style.width;
+                const originalHeight = mapContainer.style.height;
+                const pixelHeight = mapContainer.clientHeight;
+                mapContainer.style.width = `${pixelHeight * targetAspect}px`;
+                map.invalidateSize();
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // Handle overlay visibility for PDF
+                let overlayVisibleBefore = true;
+                if (imageOverlay) {
+                    overlayVisibleBefore = imageOverlay.options.opacity > 0;
+                    if (!document.getElementById('overlay-in-pdf').checked) {
+                        imageOverlay.setOpacity(0);
+                    } else {
+                        // ensure it's at user-set opacity (already)
+                        const pct = parseInt(document.getElementById('overlay-opacity').value, 10) / 100;
+                        imageOverlay.setOpacity(pct);
+                    }
+                }
+
+                // Capture map
+                const mapCanvas = await html2canvas(mapContainer, { useCORS: true, scale: 2, logging: false });
+
+                // Restore overlay opacity
+                if (imageOverlay) {
+                    const pct = parseInt(document.getElementById('overlay-opacity').value, 10) / 100;
+                    imageOverlay.setOpacity(pct);
+                }
+
+                // Restore map container size
+                mapContainer.style.width = originalWidth;
+                mapContainer.style.height = originalHeight;
+                map.invalidateSize();
+
+                // Fill template fields
                 populateCodeBoxes('render-state', document.getElementById('meta-state').value, 2);
                 populateCodeBoxes('render-district', document.getElementById('meta-district').value, 2);
                 populateCodeBoxes('render-tehsil', document.getElementById('meta-tehsil').value, 4);
@@ -556,14 +613,24 @@
                 populateCodeBoxes('render-hlb', document.getElementById('meta-hlb').value, 4);
                 document.getElementById('render-enum-name').innerText = document.getElementById('meta-enum').value;
 
-                // Capture optimized viewport
-                const mapCanvas = await html2canvas(mapContainer, { useCORS: true, scale: 2, logging: false });
-                
+                // Populate remarks from loaded data
+                const remarks = loadedMarkerData.filter(m => m.note && m.note.trim());
+                const remarksHtml = remarks.map(m => `<div>• ${escapeHtml(m.name || '?')}: ${escapeHtml(m.note)}</div>`).join('');
+                const remarksSection = document.getElementById('render-remarks');
+                if (remarks.length > 0) {
+                    remarksSection.style.display = 'block';
+                    document.getElementById('render-remarks-list').innerHTML = remarksHtml;
+                } else {
+                    remarksSection.style.display = 'none';
+                }
+
+                // Place captured image into template
                 mapDest.innerHTML = '';
                 const mapImg = new Image();
                 mapImg.src = mapCanvas.toDataURL('image/jpeg', 1.0);
                 mapDest.appendChild(mapImg);
 
+                // Render template to PDF
                 template.style.zIndex = "1000"; 
                 const docCanvas = await html2canvas(template, { scale: 2, logging: false });
                 template.style.zIndex = "-100"; 
