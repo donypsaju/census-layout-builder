@@ -29,48 +29,61 @@
         .map-normal-mode { filter: none; }
         .map-blank-mode { background: #ffffff !important; }
 
-        /* Structural Markers - Downscaled to prevent DOM collision */
+        /* Unified Shape & Label Styling */
         .custom-icon-wrapper { pointer-events: none; }
-        .census-shape {
-            display: flex; align-items: center; justify-content: center;
-            border: 1.5px solid #000; background: #fff;
-            position: relative; z-index: 10;
-        }
         
-        .marker-pucca { width: 16px; height: 16px; border-radius: 1px; }
-        .marker-kutcha { 
+        .marker-container {
+            position: relative;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .census-shape-base { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+        .marker-pucca {
+            border: 1.5px solid #000;
+            background: #fff;
+            border-radius: 1px;
+        }
+
+        /* Pure CSS Triangle scaled for text insertion */
+        .marker-kutcha {
             width: 0; height: 0; 
-            border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 16px solid #000;
-            background: none !important; border: none !important; position: relative;
+            border-left: 12px solid transparent; border-right: 12px solid transparent; border-bottom: 22px solid #000;
+            background: none !important; border-top: none !important;
+            transform: translateY(-2px); /* Centering offset */
         }
         .marker-kutcha::after {
-            content: ''; position: absolute; top: 2px; left: -7px; width: 0; height: 0;
-            border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 13px solid #fff;
+            content: ''; position: absolute; top: 2px; left: -10px; width: 0; height: 0;
+            border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 19px solid #fff;
         }
 
         .hatch-pucca { background: repeating-linear-gradient(45deg, #000, #000 1px, #fff 1px, #fff 3px) !important; }
-        .hatch-kutcha::after { border-bottom: 13px solid transparent; background: repeating-linear-gradient(45deg, #000, #000 1px, transparent 1px, transparent 3px); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+        .hatch-kutcha::after { border-bottom: 19px solid transparent; background: repeating-linear-gradient(45deg, #000, #000 1px, transparent 1px, transparent 3px); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
 
-        /* Third structural category: landmarks / utility / other non-house structures (e.g. transformer, temple) */
-        .marker-other { width: 15px; height: 15px; border-radius: 50%; }
-        .hatch-other { background: repeating-linear-gradient(45deg, #000, #000 1px, #fff 1px, #fff 3px) !important; }
-
-        /* Label hide/show */
-        body.hide-labels .census-label { display: none; }
-
-        .census-label {
-            position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
-            background: rgba(255,255,255,0.95); border: 1px solid #000;
-            color: #000; font-family: monospace; font-size: 8px; font-weight: bold;
-            line-height: 1; text-align: center; padding: 1px 2px; border-radius: 2px;
-            pointer-events: auto; z-index: 20; min-width: 18px;
+        .shape-text {
+            position: absolute;
+            z-index: 20;
+            color: #000;
+            font-family: monospace;
+            font-size: 9px;
+            font-weight: 900;
+            text-align: center;
+            line-height: 1;
+            /* White text shadow for contrast against hatching */
+            text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; 
+            transform: translateY(2px); /* Visual center adjustment for triangles */
         }
-        .census-label-divider { border-top: 1px solid #000; margin: 1px 0; width: 100%; }
+        .pucca-text { transform: translateY(0px); }
 
         /* Hidden Print Template Styles */
         #print-template {
             position: absolute; left: -9999px; top: 0;
-            width: 297mm; height: 210mm; /* Default A4 Landscape layout scaling basis */
+            width: 297mm; height: 210mm;
             background: white; color: black; font-family: Arial, sans-serif;
             box-sizing: border-box; padding: 8mm;
             display: flex; flex-direction: column;
@@ -88,16 +101,15 @@
         .code-box { width: 12px; height: 12px; border: 1px solid black; display: flex; align-items: center; justify-content: center; font-family: monospace; font-weight: bold;}
         
         .print-map-area { flex: 1; border: 2px solid black; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #fff;}
-        .print-map-area img { width: 100%; height: 100%; object-fit: fill; } /* No cropping, aspect ratio matched */
+        .print-map-area img { width: 100%; height: 100%; object-fit: cover; } 
 
         .print-footer { margin-top: 4mm; display: flex; justify-content: space-between; font-size: 9pt; border-top: 1px dashed black; padding-top: 4mm;}
         .signature-block { display: flex; flex-direction: column; gap: 6mm; width: 50mm;}
         .signature-line { border-top: 1px solid black; text-align: center; font-size: 7pt; padding-top: 2px;}
 
-        /* Isolation classes for PDF capture */
+        /* Isolation classes */
         .capturing-map .leaflet-control-container,
-        .capturing-map #toggle-sidebar,
-        .capturing-map .overlay-handle-wrapper { display: none !important; }
+        .capturing-map #toggle-sidebar { display: none !important; }
     </style>
 </head>
 <body class="flex h-screen text-slate-300 antialiased overflow-hidden">
@@ -143,39 +155,14 @@
             <section>
                 <h2 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-700 pb-1">2. Map Assets</h2>
                 <div class="space-y-3">
-                    <div>
-                        <label class="block w-full text-center bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 rounded cursor-pointer transition-colors">
-                            Load Block Coordinates (JSON)
-                            <input type="file" id="json-upload" accept=".json" class="hidden">
-                        </label>
-                        <div id="json-status" class="hidden mt-2 text-[10px] leading-relaxed bg-slate-950 border border-slate-800 rounded p-2 text-slate-400 space-y-1"></div>
-                        <label class="flex items-center gap-2 mt-2 text-[10px] text-slate-400 cursor-pointer">
-                            <input type="checkbox" id="toggle-labels" checked class="accent-indigo-500">
-                            Show house number labels
-                        </label>
-                    </div>
-
-                    <div class="pt-2 border-t border-slate-800">
-                        <label class="block w-full text-center bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold py-2 rounded cursor-pointer transition-colors">
-                            Load Overlay Image
-                            <input type="file" id="image-upload" accept="image/*" class="hidden">
-                        </label>
-                        <div id="overlay-controls" class="hidden mt-2 space-y-2 bg-slate-950 border border-slate-800 rounded p-2">
-                            <p class="text-[9px] text-slate-500 leading-snug">Drag the two amber handles on the map to stretch/reposition the image over real landmarks, then trace the boundary on top of it with the polygon tool.</p>
-                            <div class="flex justify-between items-center">
-                                <label class="text-[10px] text-slate-500 uppercase">Opacity</label>
-                                <span id="opacity-value" class="text-[10px] text-slate-400">50%</span>
-                            </div>
-                            <input type="range" id="overlay-opacity" min="10" max="100" value="50" class="w-full accent-indigo-500">
-                            <label class="flex items-center gap-2 text-[10px] text-slate-400 cursor-pointer">
-                                <input type="checkbox" id="overlay-in-pdf" class="accent-indigo-500">
-                                Include this image in the printed PDF
-                            </label>
-                            <button id="remove-overlay" class="w-full text-center bg-red-950 hover:bg-red-900 text-red-300 text-[10px] font-semibold py-1.5 rounded transition-colors border border-red-900">
-                                Remove Overlay
-                            </button>
-                        </div>
-                    </div>
+                    <label class="block w-full text-center bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 rounded cursor-pointer transition-colors">
+                        Load Block Coordinates (JSON)
+                        <input type="file" id="json-upload" accept=".json" class="hidden">
+                    </label>
+                    <label class="block w-full text-center bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold py-2 rounded cursor-pointer transition-colors">
+                        Load Overlay Image
+                        <input type="file" id="image-upload" accept="image/*" class="hidden">
+                    </label>
                 </div>
             </section>
 
@@ -211,13 +198,12 @@
                     <button id="generate-pdf" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm py-2 rounded shadow transition-colors">
                         Generate PDF Layout
                     </button>
-                    <p id="pdf-status" class="text-[10px] text-amber-400 text-center hidden">Calculating optimal bounds & rendering...</p>
+                    <p id="pdf-status" class="text-[10px] text-amber-400 text-center hidden">Calculating tight bounds & rendering...</p>
                 </div>
             </section>
         </div>
     </aside>
 
-    <!-- Interactive Map Container -->
     <main class="flex-1 relative bg-slate-950 h-full">
         <button id="toggle-sidebar" class="absolute left-0 top-4 z-[999] bg-slate-800 border-y border-r border-slate-600 text-white p-2 rounded-r-md shadow-lg hover:bg-slate-700 transition-colors focus:outline-none" title="Toggle Console">
             <svg id="icon-left" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
@@ -227,7 +213,6 @@
         <div id="map" class="w-full h-full"></div>
     </main>
 
-    <!-- Hidden Template -->
     <div id="print-template">
         <div class="print-header">
             <h1>CENSUS OF INDIA 2027</h1>
@@ -253,13 +238,6 @@
                     <span style="display:inline-block; width: 8px; height: 8px; border: 1px solid black; background: repeating-linear-gradient(45deg, #000, #000 1px, #fff 1px, #fff 3px); margin-right: 3px;"></span> Pucca Non-Res<br>
                     <span style="display:inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid black; margin-right: 3px;"></span> Kutcha Res<br>
                     <span style="display:inline-block; width: 10px; height: 8px; border: 1px solid black; background: repeating-linear-gradient(45deg, #000, #000 1px, #fff 1px, #fff 3px); margin-right: 3px;"></span> Kutcha Non-Res<br>
-                    <span style="display:inline-block; width: 8px; height: 8px; border-radius: 50%; border: 1px solid black; margin-right: 3px;"></span> Other / Landmark<br>
-                    <span style="display:inline-block; width: 12px; height: 0; border-top: 2px solid black; margin-right: 3px; vertical-align: middle;"></span> Block Boundary
-                </div>
-
-                <div id="render-remarks" style="display:none; margin-top: 4mm; font-size: 7pt; line-height: 1.4; border-top: 1px dashed #999; padding-top: 2mm;">
-                    <strong>REMARKS</strong>
-                    <div id="render-remarks-list"></div>
                 </div>
             </div>
             <div class="print-map-area" id="render-map-container"></div>
@@ -278,7 +256,6 @@
     </div>
 
     <script>
-        // --- Sidebar & Layout Logic ---
         const sidebar = document.getElementById('sidebar');
         const toggleBtn = document.getElementById('toggle-sidebar');
         
@@ -300,7 +277,6 @@
             }
         });
 
-        // --- Map Initialization ---
         const map = L.map('map', { zoomControl: false }).setView([9.736, 76.518], 16);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
         
@@ -308,11 +284,8 @@
         const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 22, maxNativeZoom: 19, className: 'map-normal-mode' });
         const blankCanvas = L.tileLayer('', { maxZoom: 22, className: 'map-blank-mode' }); 
 
-        blankCanvas.addTo(map); // Defaulting to blank canvas for optimal print behavior
+        blankCanvas.addTo(map); 
         L.control.layers({ "Street Map": osmStreet, "Satellite": esriSatellite, "Blank Canvas": blankCanvas }, null, { position: 'bottomleft' }).addTo(map);
-
-        // Group for user‑drawn shapes (boundary, roads) so we can include them in bounds
-        const drawnItems = L.featureGroup().addTo(map);
 
         map.pm.addControls({
             position: 'topright', drawCircleMarker: false, drawCircle: false, cutPolygon: false,
@@ -320,149 +293,50 @@
             editMode: true, dragMode: true, removalMode: true,
         });
 
-        // Route all Geoman drawings into our dedicated feature group
-        map.pm.setGlobalOptions({
-            layerGroup: drawnItems,
-            templineStyle: { color: '#000000', weight: 2 },
-            hintlineStyle: { color: '#000000', weight: 2, dashArray: [5, 5] },
-            pathOptions: { color: '#000000', weight: 2, fillOpacity: 0.04, fillColor: '#000000' }
-        });
-
-        // --- Data Variables ---
         let markersLayer = L.featureGroup().addTo(map);
         let imageOverlay = null;
-        let overlayHandles = [];
-        let loadedMarkerData = []; // Raw parsed JSON, kept for remarks
-
-        function escapeHtml(str) {
-            return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
-        }
-
-        const TYPE_SHAPE_CLASS = { 'pucca-house': 'marker-pucca', 'kutcha-house': 'marker-kutcha', 'other-building': 'marker-other' };
-        const TYPE_HATCH_CLASS = { 'pucca-house': 'hatch-pucca', 'kutcha-house': 'hatch-kutcha', 'other-building': 'hatch-other' };
-
-        // Label toggle (checkbox vs. CSS class)
-        document.getElementById('toggle-labels').addEventListener('change', (e) => {
-            document.body.classList.toggle('hide-labels', !e.target.checked);
-        });
 
         document.getElementById('json-upload').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            const statusBox = document.getElementById('json-status');
             const reader = new FileReader();
             reader.onload = (event) => {
-                statusBox.classList.remove('hidden');
-                try {
-                    const data = JSON.parse(event.target.result);
-                    if (!Array.isArray(data)) {
-                        throw new Error('File must contain a JSON array of marker objects.');
+                markersLayer.clearLayers();
+                const data = JSON.parse(event.target.result);
+                const bounds = [];
+                data.forEach(item => {
+                    if (!item.coords || item.coords.length !== 2) return;
+                    bounds.push([item.coords[0], item.coords[1]]);
+
+                    const isPucca = item.type === 'pucca-house';
+                    const isNR = item.subtype === 'nr';
+                    
+                    let shapeBase = 'census-shape-base ';
+                    let textClass = 'shape-text ';
+
+                    if (isPucca) {
+                        shapeBase += 'marker-pucca ';
+                        textClass += 'pucca-text ';
+                        if (isNR) shapeBase += 'hatch-pucca ';
+                    } else {
+                        shapeBase += 'marker-kutcha ';
+                        if (isNR) shapeBase += 'hatch-kutcha ';
                     }
 
-                    markersLayer.clearLayers();
-                    loadedMarkerData = data;
+                    const htmlStr = `
+                        <div class="marker-container">
+                            <div class="${shapeBase}"></div>
+                            <span class="${textClass}">${item.name || '?'}</span>
+                        </div>`;
 
-                    const bounds = [];
-                    const typeCounts = {};
-                    const nameCounts = {};
-                    let totalCensusCount = 0;
-                    let skippedCount = 0;
-                    let unknownTypeCount = 0;
-
-                    data.forEach(item => {
-                        const c = item && item.coords;
-                        if (!c || c.length !== 2 || typeof c[0] !== 'number' || typeof c[1] !== 'number') {
-                            skippedCount++;
-                            return;
-                        }
-                        bounds.push([c[0], c[1]]);
-
-                        const isKnownType = TYPE_SHAPE_CLASS.hasOwnProperty(item.type);
-                        const resolvedType = isKnownType ? item.type : 'other-building';
-                        if (!isKnownType) unknownTypeCount++;
-                        typeCounts[resolvedType] = (typeCounts[resolvedType] || 0) + 1;
-
-                        const isNR = item.subtype === 'nr';
-                        let shapeClass = 'census-shape ' + TYPE_SHAPE_CLASS[resolvedType] + ' ';
-                        if (isNR) shapeClass += TYPE_HATCH_CLASS[resolvedType] + ' ';
-
-                        const count = item.censusCount ?? 1;
-                        if (typeof count === 'number') totalCensusCount += count;
-
-                        const hasNote = !!(item.note && String(item.note).trim());
-                        if (item.name) nameCounts[item.name] = (nameCounts[item.name] || 0) + 1;
-
-                        const safeName = escapeHtml(item.name || '?');
-                        const safeNote = hasNote ? escapeHtml(item.note) : '';
-
-                        const htmlStr = `
-                            <div class="relative flex flex-col items-center justify-center"${hasNote ? ` title="${safeNote}"` : ''}>
-                                <div class="census-label">
-                                    <div>${safeName}</div>
-                                    <div class="census-label-divider"></div>
-                                    <div>(${count})${hasNote ? '*' : ''}</div>
-                                </div>
-                                <div class="${shapeClass}"></div>
-                            </div>`;
-
-                        const icon = L.divIcon({ className: 'custom-icon-wrapper', html: htmlStr, iconSize: [16, 16], iconAnchor: [8, 8] });
-                        const marker = L.marker([c[0], c[1]], { icon, pmIgnore: true });
-                        marker.addTo(markersLayer);
-                    });
-
-                    if (bounds.length > 0) map.fitBounds(L.latLngBounds(bounds), { padding: [20, 20] });
-
-                    const dupes = Object.entries(nameCounts).filter(([, n]) => n > 1).map(([n]) => n);
-
-                    let html = `<div class="text-emerald-400">&#10003; ${bounds.length} marker(s) loaded</div>`;
-                    html += `<div>Pucca: ${typeCounts['pucca-house'] || 0} &middot; Kutcha: ${typeCounts['kutcha-house'] || 0} &middot; Other: ${typeCounts['other-building'] || 0}</div>`;
-                    html += `<div>Total census count: ${totalCensusCount}</div>`;
-                    if (skippedCount > 0) html += `<div class="text-amber-400">&#9888; ${skippedCount} item(s) skipped &mdash; missing/invalid coordinates</div>`;
-                    if (unknownTypeCount > 0) html += `<div class="text-amber-400">&#9888; ${unknownTypeCount} item(s) had an unrecognized type, drawn as Other</div>`;
-                    if (dupes.length > 0) html += `<div class="text-amber-400">&#9888; Repeated house no.: ${dupes.map(escapeHtml).join(', ')} &mdash; please verify</div>`;
-                    statusBox.innerHTML = html;
-
-                } catch (err) {
-                    console.error('JSON load failed:', err);
-                    statusBox.innerHTML = `<div class="text-red-400">&#10007; Could not load file: ${escapeHtml(err.message)}</div>`;
-                }
-            };
-            reader.onerror = () => {
-                statusBox.classList.remove('hidden');
-                statusBox.innerHTML = `<div class="text-red-400">&#10007; Could not read the file.</div>`;
+                    const icon = L.divIcon({ className: 'custom-icon-wrapper', html: htmlStr, iconSize: [24, 24], iconAnchor: [12, 12] });
+                    const marker = L.marker([item.coords[0], item.coords[1]], { icon });
+                    marker.addTo(markersLayer);
+                });
+                if (bounds.length > 0) map.fitBounds(L.latLngBounds(bounds), { padding: [10, 10] });
             };
             reader.readAsText(file);
         });
-
-        function clearOverlayHandles() {
-            overlayHandles.forEach(h => map.removeLayer(h));
-            overlayHandles = [];
-        }
-
-        function addOverlayHandles(bounds) {
-            clearOverlayHandles();
-            const handleIcon = L.divIcon({
-                className: 'overlay-handle-wrapper',
-                html: '<div style="width:14px;height:14px;background:#f59e0b;border:2px solid #000;border-radius:50%;box-shadow:0 0 0 2px #fff;cursor:move;"></div>',
-                iconSize: [14, 14], iconAnchor: [7, 7]
-            });
-            const sw = L.marker(bounds.getSouthWest(), { icon: handleIcon, draggable: true, zIndexOffset: 2000, pmIgnore: true }).addTo(map);
-            const ne = L.marker(bounds.getNorthEast(), { icon: handleIcon, draggable: true, zIndexOffset: 2000, pmIgnore: true }).addTo(map);
-            const onDrag = () => {
-                if (!imageOverlay) return;
-                imageOverlay.setBounds(L.latLngBounds(sw.getLatLng(), ne.getLatLng()));
-            };
-            sw.on('drag', onDrag);
-            ne.on('drag', onDrag);
-            overlayHandles = [sw, ne];
-        }
-
-        function removeOverlay() {
-            if (imageOverlay) { map.removeLayer(imageOverlay); imageOverlay = null; }
-            clearOverlayHandles();
-            document.getElementById('overlay-controls').classList.add('hidden');
-            document.getElementById('image-upload').value = '';
-        }
 
         document.getElementById('image-upload').addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -470,32 +344,19 @@
             const reader = new FileReader();
             reader.onload = (event) => {
                 if (imageOverlay) map.removeLayer(imageOverlay);
-                clearOverlayHandles();
                 const tempImg = new Image();
                 tempImg.onload = () => {
                     const aspect = tempImg.width / tempImg.height;
                     const center = map.getCenter();
                     const latOff = 0.003; 
                     const bounds = L.latLngBounds([center.lat - latOff, center.lng - (latOff * aspect)], [center.lat + latOff, center.lng + (latOff * aspect)]);
-                    const initialOpacity = (parseInt(document.getElementById('overlay-opacity').value, 10) || 50) / 100;
-                    imageOverlay = L.imageOverlay(event.target.result, bounds, { opacity: initialOpacity, className: 'reference-overlay-img' }).addTo(map);
-                    addOverlayHandles(bounds);
-                    document.getElementById('overlay-controls').classList.remove('hidden');
+                    imageOverlay = L.imageOverlay(event.target.result, bounds, { opacity: 0.5 }).addTo(map);
                 };
                 tempImg.src = event.target.result;
             };
             reader.readAsDataURL(file);
         });
 
-        document.getElementById('overlay-opacity').addEventListener('input', (e) => {
-            const pct = parseInt(e.target.value, 10);
-            document.getElementById('opacity-value').textContent = pct + '%';
-            if (imageOverlay) imageOverlay.setOpacity(pct / 100);
-        });
-
-        document.getElementById('remove-overlay').addEventListener('click', removeOverlay);
-
-        // --- Strict Document Generation Pipeline ---
         function populateCodeBoxes(id, value, length) {
             const container = document.getElementById(id);
             container.innerHTML = '';
@@ -510,7 +371,6 @@
             const template = document.getElementById('print-template');
             const mapDest = document.getElementById('render-map-container');
 
-            // Paper Dimensions Dictionary (mm)
             const sizes = {
                 'a4': { w: 210, h: 297 },
                 'a3': { w: 297, h: 420 },
@@ -527,14 +387,9 @@
             } else {
                 pdfW = sizes[sizeSelection].w;
                 pdfH = sizes[sizeSelection].h;
+                if (orientation === 'landscape') { const temp = pdfW; pdfW = pdfH; pdfH = temp; }
             }
 
-            // Apply orientation swap for both custom and preset sizes
-            if (orientation === 'landscape') {
-                [pdfW, pdfH] = [pdfH, pdfW];
-            }
-
-            // Update template dimensions to match output exactly
             template.style.width = `${pdfW}mm`;
             template.style.height = `${pdfH}mm`;
 
@@ -543,69 +398,13 @@
             document.body.classList.add('capturing-map');
 
             try {
-                // Compute combined bounds: markers + drawn shapes
-                const mBounds = markersLayer.getBounds();
-                const dBounds = drawnItems.getBounds();
-                let fullBounds = null;
-                if (mBounds.isValid()) fullBounds = mBounds;
-                if (dBounds.isValid()) {
-                    fullBounds = fullBounds ? fullBounds.extend(dBounds) : dBounds;
-                }
-                if (fullBounds) {
-                    map.fitBounds(fullBounds, { padding: [20, 20] });
+                // Strict zero-padding boundary enforcement to cut out all external margins.
+                const dataBounds = markersLayer.getBounds();
+                if (dataBounds.isValid()) {
+                    map.fitBounds(dataBounds, { padding: [0, 0] });
                     await new Promise(resolve => setTimeout(resolve, 800));
                 }
 
-                // Resize map container to match target print-map-area aspect ratio
-                // Compute target aspect ratio of the map area inside template
-                const sidebarWidth = 60; // mm
-                const gap = 4; // mm
-                const padding = 8 * 2; // 8mm on each side of template
-                const templateInnerW = pdfW - padding;
-                const mapAreaW = templateInnerW - sidebarWidth - gap;
-                const mapAreaH = pdfH - padding - /* header + footer approx */ 30; // rough, but we just need aspect ratio
-                // Actually the map area height is the whole print-body height, which fills remaining space.
-                // Simpler: use the paper dimensions directly; print-map-area's container is the same height as the body.
-                // We'll compute aspect from the known widths ignoring exact vertical padding for simplicity.
-                // Let's compute width/height from the outer container.
-                const targetAspect = mapAreaW / mapAreaH;
-                
-                // Get current map container height, set width to match aspect
-                const originalWidth = mapContainer.style.width;
-                const originalHeight = mapContainer.style.height;
-                const pixelHeight = mapContainer.clientHeight;
-                mapContainer.style.width = `${pixelHeight * targetAspect}px`;
-                map.invalidateSize();
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                // Handle overlay visibility for PDF
-                let overlayVisibleBefore = true;
-                if (imageOverlay) {
-                    overlayVisibleBefore = imageOverlay.options.opacity > 0;
-                    if (!document.getElementById('overlay-in-pdf').checked) {
-                        imageOverlay.setOpacity(0);
-                    } else {
-                        // ensure it's at user-set opacity (already)
-                        const pct = parseInt(document.getElementById('overlay-opacity').value, 10) / 100;
-                        imageOverlay.setOpacity(pct);
-                    }
-                }
-
-                // Capture map
-                const mapCanvas = await html2canvas(mapContainer, { useCORS: true, scale: 2, logging: false });
-
-                // Restore overlay opacity
-                if (imageOverlay) {
-                    const pct = parseInt(document.getElementById('overlay-opacity').value, 10) / 100;
-                    imageOverlay.setOpacity(pct);
-                }
-
-                // Restore map container size
-                mapContainer.style.width = originalWidth;
-                mapContainer.style.height = originalHeight;
-                map.invalidateSize();
-
-                // Fill template fields
                 populateCodeBoxes('render-state', document.getElementById('meta-state').value, 2);
                 populateCodeBoxes('render-district', document.getElementById('meta-district').value, 2);
                 populateCodeBoxes('render-tehsil', document.getElementById('meta-tehsil').value, 4);
@@ -613,24 +412,13 @@
                 populateCodeBoxes('render-hlb', document.getElementById('meta-hlb').value, 4);
                 document.getElementById('render-enum-name').innerText = document.getElementById('meta-enum').value;
 
-                // Populate remarks from loaded data
-                const remarks = loadedMarkerData.filter(m => m.note && m.note.trim());
-                const remarksHtml = remarks.map(m => `<div>• ${escapeHtml(m.name || '?')}: ${escapeHtml(m.note)}</div>`).join('');
-                const remarksSection = document.getElementById('render-remarks');
-                if (remarks.length > 0) {
-                    remarksSection.style.display = 'block';
-                    document.getElementById('render-remarks-list').innerHTML = remarksHtml;
-                } else {
-                    remarksSection.style.display = 'none';
-                }
-
-                // Place captured image into template
+                const mapCanvas = await html2canvas(mapContainer, { useCORS: true, scale: 2, logging: false });
+                
                 mapDest.innerHTML = '';
                 const mapImg = new Image();
                 mapImg.src = mapCanvas.toDataURL('image/jpeg', 1.0);
                 mapDest.appendChild(mapImg);
 
-                // Render template to PDF
                 template.style.zIndex = "1000"; 
                 const docCanvas = await html2canvas(template, { scale: 2, logging: false });
                 template.style.zIndex = "-100"; 
