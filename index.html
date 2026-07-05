@@ -55,7 +55,7 @@
             width: 0; height: 0; 
             border-left: 12px solid transparent; border-right: 12px solid transparent; border-bottom: 22px solid #000;
             background: none !important; border-top: none !important;
-            transform: translateY(-2px); /* Centering offset */
+            transform: translateY(-2px);
         }
         .marker-kutcha::after {
             content: ''; position: absolute; top: 2px; left: -10px; width: 0; height: 0;
@@ -74,9 +74,8 @@
             font-weight: 900;
             text-align: center;
             line-height: 1;
-            /* White text shadow for contrast against hatching */
             text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; 
-            transform: translateY(2px); /* Visual center adjustment for triangles */
+            transform: translateY(2px);
         }
         .pucca-text { transform: translateY(0px); }
 
@@ -101,7 +100,7 @@
         .code-box { width: 12px; height: 12px; border: 1px solid black; display: flex; align-items: center; justify-content: center; font-family: monospace; font-weight: bold;}
         
         .print-map-area { flex: 1; border: 2px solid black; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #fff;}
-        .print-map-area img { width: 100%; height: 100%; object-fit: cover; } 
+        .print-map-area img { width: 100%; height: 100%; object-fit: contain; } 
 
         .print-footer { margin-top: 4mm; display: flex; justify-content: space-between; font-size: 9pt; border-top: 1px dashed black; padding-top: 4mm;}
         .signature-block { display: flex; flex-direction: column; gap: 6mm; width: 50mm;}
@@ -198,7 +197,7 @@
                     <button id="generate-pdf" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm py-2 rounded shadow transition-colors">
                         Generate PDF Layout
                     </button>
-                    <p id="pdf-status" class="text-[10px] text-amber-400 text-center hidden">Calculating tight bounds & rendering...</p>
+                    <p id="pdf-status" class="text-[10px] text-amber-400 text-center hidden">Forcing tight bounds & rendering...</p>
                 </div>
             </section>
         </div>
@@ -277,7 +276,8 @@
             }
         });
 
-        const map = L.map('map', { zoomControl: false }).setView([9.736, 76.518], 16);
+        // Fractional zoom engine guarantees it can stop exactly on the edge of the coordinates
+        const map = L.map('map', { zoomControl: false, zoomSnap: 0, zoomDelta: 0.25 }).setView([9.736, 76.518], 16);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
         
         const osmStreet = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22, maxNativeZoom: 19, className: 'map-dark-mode' });
@@ -329,7 +329,7 @@
                             <span class="${textClass}">${item.name || '?'}</span>
                         </div>`;
 
-                    const icon = L.divIcon({ className: 'custom-icon-wrapper', html: htmlStr, iconSize: [24, 24], iconAnchor: [12, 12] });
+                    const icon = L.divIcon({ className: 'custom-icon-wrapper', html: htmlStr, iconSize: [16, 16], iconAnchor: [8, 8] });
                     const marker = L.marker([item.coords[0], item.coords[1]], { icon });
                     marker.addTo(markersLayer);
                 });
@@ -390,6 +390,7 @@
                 if (orientation === 'landscape') { const temp = pdfW; pdfW = pdfH; pdfH = temp; }
             }
 
+            // Set template to exact target mm dimensions
             template.style.width = `${pdfW}mm`;
             template.style.height = `${pdfH}mm`;
 
@@ -398,13 +399,62 @@
             document.body.classList.add('capturing-map');
 
             try {
-                // Strict zero-padding boundary enforcement to cut out all external margins.
-                const dataBounds = markersLayer.getBounds();
-                if (dataBounds.isValid()) {
-                    map.fitBounds(dataBounds, { padding: [0, 0] });
-                    await new Promise(resolve => setTimeout(resolve, 800));
-                }
+                // Temporarily bring template into invisible viewport to calculate true pixel aspect ratio
+                template.style.position = 'fixed';
+                template.style.left = '0';
+                template.style.top = '0';
+                template.style.zIndex = '-100';
+                template.style.opacity = '0';
+                
+                // Force reflow
+                void template.offsetWidth;
+                
+                const mapAreaRect = mapDest.getBoundingClientRect();
+                
+                // Push template back off-screen
+                template.style.position = 'absolute';
+                template.style.left = '-9999px';
+                template.style.opacity = '1';
 
+                const dataBounds = markersLayer.getBounds();
+                if (!dataBounds.isValid()) throw new Error("No coordinate data to map.");
+
+                // Save active map state
+                const origWidth = mapContainer.style.width;
+                const origHeight = mapContainer.style.height;
+                const origPosition = mapContainer.style.position;
+                const origZ = mapContainer.style.zIndex;
+
+                // Force interactive map to precisely match the PDF template's target pixel dimensions (scaled x2 for hi-res)
+                mapContainer.style.position = 'absolute';
+                mapContainer.style.zIndex = '9999';
+                mapContainer.style.width = `${mapAreaRect.width * 2}px`;
+                mapContainer.style.height = `${mapAreaRect.height * 2}px`;
+                map.invalidateSize();
+
+                // Force tight mathematical fit on the newly shaped container
+                map.fitBounds(dataBounds, { padding: [10, 10] }); // 10px buffer to prevent edge clipping
+                
+                // Delay to allow Leaflet tile engine to fetch high-res tiles for the new bounding box
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                const mapCanvas = await html2canvas(mapContainer, { useCORS: true, scale: 1, logging: false });
+                
+                // Restore interactive map to normal
+                mapContainer.style.position = origPosition;
+                mapContainer.style.width = origWidth;
+                mapContainer.style.height = origHeight;
+                mapContainer.style.zIndex = origZ;
+                map.invalidateSize();
+                map.fitBounds(dataBounds, { padding: [20, 20] }); // Restore user view
+
+                // Inject perfectly cropped hi-res map into the template
+                mapDest.innerHTML = '';
+                const mapImg = new Image();
+                mapImg.src = mapCanvas.toDataURL('image/jpeg', 1.0);
+                mapDest.appendChild(mapImg);
+
+                // Populate Metadata
                 populateCodeBoxes('render-state', document.getElementById('meta-state').value, 2);
                 populateCodeBoxes('render-district', document.getElementById('meta-district').value, 2);
                 populateCodeBoxes('render-tehsil', document.getElementById('meta-tehsil').value, 4);
@@ -412,13 +462,7 @@
                 populateCodeBoxes('render-hlb', document.getElementById('meta-hlb').value, 4);
                 document.getElementById('render-enum-name').innerText = document.getElementById('meta-enum').value;
 
-                const mapCanvas = await html2canvas(mapContainer, { useCORS: true, scale: 2, logging: false });
-                
-                mapDest.innerHTML = '';
-                const mapImg = new Image();
-                mapImg.src = mapCanvas.toDataURL('image/jpeg', 1.0);
-                mapDest.appendChild(mapImg);
-
+                // Capture Final PDF Form
                 template.style.zIndex = "1000"; 
                 const docCanvas = await html2canvas(template, { scale: 2, logging: false });
                 template.style.zIndex = "-100"; 
@@ -431,7 +475,7 @@
 
             } catch (error) {
                 console.error("Pipeline failed:", error);
-                alert("Document generation failed. Check console.");
+                alert("Document generation failed. " + error.message);
             } finally {
                 btn.disabled = false;
                 status.classList.add('hidden');
